@@ -79,6 +79,7 @@ summary.
 Attributes:
 
 - `summary`
+- `next_slot`
 - `slots`
 - `source`
 - `last_update`
@@ -87,8 +88,14 @@ Forecast slots use this shape:
 
 ```json
 [
-  {"from": "06:00", "to": "14:00", "direction": "BR 25"},
-  {"from": "14:00", "to": "22:00", "direction": "BR 25"}
+  {
+    "from": "06:00",
+    "to": "14:00",
+    "direction": "BR 25",
+    "date": "2026-04-22",
+    "start": "2026-04-22T06:00:00+02:00",
+    "end": "2026-04-22T14:00:00+02:00"
+  }
 ]
 ```
 
@@ -112,3 +119,15 @@ Website structures can change. The parsers are defensive, but if both sources
 cannot be parsed, the affected entities become unavailable instead of inventing
 data.
 
+## Updates with HACS
+
+HACS tracks GitHub releases for this repository. When a new release is
+published, HACS can show it as an update in Home Assistant. Install the update
+from HACS and restart Home Assistant so the updated Python code is loaded.
+
+## Acknowledgements
+
+Thank you to the Umwelt- und Nachbarschaftshaus / Umwelthaus and to
+betriebsrichtungsprognose.de for publishing operating direction information for
+Frankfurt Airport. This integration is not affiliated with, endorsed by, or
+officially connected to those websites or their operators.

@@ -32,10 +32,20 @@ class ForecastSlot:
     start: str
     end: str
     direction: str
+    date: str | None = None
+    start_iso: str | None = None
+    end_iso: str | None = None
 
     def as_dict(self) -> dict[str, str]:
         """Return the Home Assistant attribute representation."""
-        return {"from": self.start, "to": self.end, "direction": self.direction}
+        values = {"from": self.start, "to": self.end, "direction": self.direction}
+        if self.date:
+            values["date"] = self.date
+        if self.start_iso:
+            values["start"] = self.start_iso
+        if self.end_iso:
+            values["end"] = self.end_iso
+        return values
 
 
 @dataclass(frozen=True)
@@ -103,6 +113,27 @@ def parse_fallback(html: str) -> FraBetriebsrichtungData | None:
         direction = _direction_from_fallback_value(values[index])
         if direction is None:
             continue
+        start_dt = _datetime_from_fallback_label(labels[index])
+        end_dt = None
+        if start_dt:
+            end_dt = (
+                _datetime_from_fallback_label(labels[index + 1])
+                if index + 1 < count
+                else start_dt + timedelta(hours=3)
+            )
+        if start_dt and end_dt:
+            slots.append(
+                ForecastSlot(
+                    start=start_dt.strftime("%H:%M"),
+                    end=end_dt.strftime("%H:%M"),
+                    direction=direction,
+                    date=start_dt.date().isoformat(),
+                    start_iso=start_dt.isoformat(),
+                    end_iso=end_dt.isoformat(),
+                )
+            )
+            continue
+
         start = _time_from_fallback_label(labels[index])
         end = (
             _time_from_fallback_label(labels[index + 1])
@@ -222,6 +253,9 @@ def _parse_umwelthaus_slots(soup: BeautifulSoup) -> tuple[ForecastSlot, ...]:
                 start=start_dt.strftime("%H:%M"),
                 end=end_dt.strftime("%H:%M"),
                 direction=direction,
+                date=start_dt.date().isoformat(),
+                start_iso=start_dt.isoformat(),
+                end_iso=end_dt.isoformat(),
             )
         )
     return tuple(slots)
@@ -282,6 +316,28 @@ def _time_from_fallback_label(label: Any) -> str | None:
         return None
     match = re.search(r"(\d{2}:\d{2})$", label.strip())
     return match.group(1) if match else None
+
+
+def _datetime_from_fallback_label(label: Any) -> datetime | None:
+    if not isinstance(label, str):
+        return None
+
+    match = re.search(r"\b(\d{1,2})\.(\d{1,2})\s+(\d{2}):(\d{2})$", label.strip())
+    if not match:
+        return None
+
+    now = datetime.now(AIRPORT_TZ)
+    day, month, hour, minute = (int(part) for part in match.groups())
+    try:
+        parsed = datetime(now.year, month, day, hour, minute, tzinfo=AIRPORT_TZ)
+    except ValueError:
+        return None
+
+    if parsed < now - timedelta(days=180):
+        return parsed.replace(year=parsed.year + 1)
+    if parsed > now + timedelta(days=180):
+        return parsed.replace(year=parsed.year - 1)
+    return parsed
 
 
 def _add_hours_to_time(value: str | None, hours: int) -> str | None:

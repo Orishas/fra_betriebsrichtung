@@ -16,6 +16,7 @@ from .const import (
     ATTR_CURRENT_SINCE,
     ATTR_LABEL,
     ATTR_LAST_UPDATE,
+    ATTR_NEXT_SLOT,
     ATTR_SLOTS,
     ATTR_SOURCE,
     ATTR_SUMMARY,
@@ -58,8 +59,10 @@ def _current_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
 
 
 def _forecast_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
+    next_slot = data.forecast_slots[0].as_dict() if data.forecast_slots else None
     return {
         ATTR_SUMMARY: data.forecast_summary,
+        ATTR_NEXT_SLOT: next_slot,
         ATTR_SLOTS: [slot.as_dict() for slot in data.forecast_slots],
         ATTR_SOURCE: data.source,
         ATTR_LAST_UPDATE: data.last_update,
@@ -155,4 +158,3 @@ def _short_state(value: str | None) -> str | None:
 
 def _without_none(values: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
-
