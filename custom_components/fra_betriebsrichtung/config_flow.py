@@ -17,18 +17,27 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_NOISE_DIRECTION,
     DEFAULT_NOISE_DIRECTION,
-    DIRECTION_OPTIONS,
     DOMAIN,
 )
+
+NOISE_DIRECTION_OPTIONS = {
+    "br_07": "BR 07",
+    "br_25": "BR 25",
+}
+DIRECTION_TO_OPTION = {value: key for key, value in NOISE_DIRECTION_OPTIONS.items()}
 
 
 def _noise_direction_schema(default: str = DEFAULT_NOISE_DIRECTION) -> vol.Schema:
     """Return the setup/options schema."""
+    default_option = DIRECTION_TO_OPTION.get(
+        default,
+        DIRECTION_TO_OPTION[DEFAULT_NOISE_DIRECTION],
+    )
     return vol.Schema(
         {
-            vol.Required(CONF_NOISE_DIRECTION, default=default): SelectSelector(
+            vol.Required(CONF_NOISE_DIRECTION, default=default_option): SelectSelector(
                 SelectSelectorConfig(
-                    options=list(DIRECTION_OPTIONS),
+                    options=list(NOISE_DIRECTION_OPTIONS),
                     mode=SelectSelectorMode.LIST,
                     translation_key=CONF_NOISE_DIRECTION,
                 )
@@ -61,7 +70,9 @@ class FraBetriebsrichtungConfigFlow(ConfigFlow, domain=DOMAIN):
                 title="FRA Betriebsrichtung",
                 data={},
                 options={
-                    CONF_NOISE_DIRECTION: user_input[CONF_NOISE_DIRECTION],
+                    CONF_NOISE_DIRECTION: NOISE_DIRECTION_OPTIONS[
+                        user_input[CONF_NOISE_DIRECTION]
+                    ],
                 },
             )
 
@@ -80,7 +91,14 @@ class FraBetriebsrichtungOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_NOISE_DIRECTION: NOISE_DIRECTION_OPTIONS[
+                        user_input[CONF_NOISE_DIRECTION]
+                    ],
+                },
+            )
 
         return self.async_show_form(
             step_id="init",
@@ -91,4 +109,3 @@ class FraBetriebsrichtungOptionsFlow(OptionsFlow):
                 )
             ),
         )
-

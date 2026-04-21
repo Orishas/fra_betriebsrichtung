@@ -34,8 +34,8 @@
   "selector": {
     "noise_direction": {
       "options": {
-        "BR 07": "BR 07 (Ostbetrieb)",
-        "BR 25": "BR 25 (Westbetrieb)"
+        "br_07": "BR 07 (Ostbetrieb)",
+        "br_25": "BR 25 (Westbetrieb)"
       }
     }
   },

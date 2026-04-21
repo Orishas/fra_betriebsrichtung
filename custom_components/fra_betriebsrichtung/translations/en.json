@@ -34,8 +34,8 @@
   "selector": {
     "noise_direction": {
       "options": {
-        "BR 07": "BR 07 (easterly operations)",
-        "BR 25": "BR 25 (westerly operations)"
+        "br_07": "BR 07 (easterly operations)",
+        "br_25": "BR 25 (westerly operations)"
       }
     }
   },
