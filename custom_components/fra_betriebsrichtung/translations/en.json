@@ -1,0 +1,57 @@
+{
+  "title": "FRA Operating Direction",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure FRA operating direction",
+        "description": "Choose which operating direction usually causes aircraft noise at your location.",
+        "data": {
+          "noise_direction": "Noise-generating operating direction"
+        },
+        "data_description": {
+          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "FRA operating direction is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "FRA operating direction options",
+        "description": "Change which operating direction usually causes aircraft noise at your location.",
+        "data": {
+          "noise_direction": "Noise-generating operating direction"
+        },
+        "data_description": {
+          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live."
+        }
+      }
+    }
+  },
+  "selector": {
+    "noise_direction": {
+      "options": {
+        "BR 07": "BR 07 (easterly operations)",
+        "BR 25": "BR 25 (westerly operations)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current": {
+        "name": "Current operating direction"
+      },
+      "forecast": {
+        "name": "Forecast operating direction"
+      }
+    },
+    "binary_sensor": {
+      "aircraft_noise": {
+        "name": "Aircraft noise"
+      }
+    }
+  }
+}

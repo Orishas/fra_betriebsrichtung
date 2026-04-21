@@ -1,0 +1,57 @@
+{
+  "title": "FRA Betriebsrichtung",
+  "config": {
+    "step": {
+      "user": {
+        "title": "FRA Betriebsrichtung einrichten",
+        "description": "Wähle aus, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht.",
+        "data": {
+          "noise_direction": "Lärmverursachende Betriebsrichtung"
+        },
+        "data_description": {
+          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "FRA Betriebsrichtung ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "FRA Betriebsrichtung Optionen",
+        "description": "Ändere, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht.",
+        "data": {
+          "noise_direction": "Lärmverursachende Betriebsrichtung"
+        },
+        "data_description": {
+          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst."
+        }
+      }
+    }
+  },
+  "selector": {
+    "noise_direction": {
+      "options": {
+        "BR 07": "BR 07 (Ostbetrieb)",
+        "BR 25": "BR 25 (Westbetrieb)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current": {
+        "name": "Aktuelle Betriebsrichtung"
+      },
+      "forecast": {
+        "name": "Betriebsrichtungsprognose"
+      }
+    },
+    "binary_sensor": {
+      "aircraft_noise": {
+        "name": "Fluglärm"
+      }
+    }
+  }
+}
