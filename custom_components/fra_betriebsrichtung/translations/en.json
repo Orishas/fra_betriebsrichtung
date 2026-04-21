@@ -46,11 +46,17 @@
       },
       "forecast": {
         "name": "Forecast operating direction"
+      },
+      "next_noise": {
+        "name": "Next aircraft noise"
       }
     },
     "binary_sensor": {
       "aircraft_noise": {
         "name": "Aircraft noise"
+      },
+      "aircraft_noise_forecast": {
+        "name": "Aircraft noise forecast"
       }
     }
   }

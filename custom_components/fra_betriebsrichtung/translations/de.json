@@ -46,11 +46,17 @@
       },
       "forecast": {
         "name": "Betriebsrichtungsprognose"
+      },
+      "next_noise": {
+        "name": "Nächster Fluglärm"
       }
     },
     "binary_sensor": {
       "aircraft_noise": {
         "name": "Fluglärm"
+      },
+      "aircraft_noise_forecast": {
+        "name": "Fluglärm Prognose"
       }
     }
   }

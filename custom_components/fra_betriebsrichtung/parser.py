@@ -55,10 +55,17 @@ class FraBetriebsrichtungData:
     current_direction: str | None = None
     current_label: str | None = None
     current_since: str | None = None
+    current_since_start: str | None = None
+    current_duration_minutes: int | None = None
     forecast_summary: str | None = None
     forecast_slots: tuple[ForecastSlot, ...] = ()
     source: str | None = None
     last_update: str | None = None
+    primary_ok: bool | None = None
+    fallback_ok: bool | None = None
+    fallback_used: bool = False
+    last_success: str | None = None
+    errors: tuple[str, ...] = ()
 
     @property
     def has_current(self) -> bool:
@@ -83,6 +90,9 @@ def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
     current_label = _clean_text(_select_text(soup, "figure.br-display-br h4"))
     current_direction = normalize_direction(current_label)
     current_since = _parse_current_since(soup)
+    current_since_start, current_duration_minutes = _parse_current_since_start(
+        current_since
+    )
 
     forecast_summary = _clean_text(_select_text(soup, "#brp p.introtext"))
     last_update = _parse_last_update(forecast_summary)
@@ -92,6 +102,8 @@ def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
         current_direction=current_direction,
         current_label=current_label,
         current_since=current_since,
+        current_since_start=current_since_start,
+        current_duration_minutes=current_duration_minutes,
         forecast_summary=forecast_summary,
         forecast_slots=forecast_slots,
         source=SOURCE_UMWELTHAUS,
@@ -179,10 +191,19 @@ def merge_data(
         current_direction=primary.current_direction or fallback.current_direction,
         current_label=primary.current_label or fallback.current_label,
         current_since=primary.current_since or fallback.current_since,
+        current_since_start=primary.current_since_start or fallback.current_since_start,
+        current_duration_minutes=primary.current_duration_minutes
+        if primary.current_duration_minutes is not None
+        else fallback.current_duration_minutes,
         forecast_summary=primary.forecast_summary or fallback.forecast_summary,
         forecast_slots=primary.forecast_slots or fallback.forecast_slots,
         source=source,
         last_update=primary.last_update or fallback.last_update,
+        primary_ok=primary.primary_ok,
+        fallback_ok=fallback.fallback_ok,
+        fallback_used=uses_fallback,
+        last_success=primary.last_success or fallback.last_success,
+        errors=primary.errors or fallback.errors,
     )
 
 
@@ -215,6 +236,66 @@ def _parse_last_update(summary: str | None) -> str | None:
         return None
     match = re.search(r"Aktuell\s*\(([^)]+)\)", summary)
     return match.group(1).strip() if match else None
+
+
+def _parse_current_since_start(value: str | None) -> tuple[str | None, int | None]:
+    if not value:
+        return None, None
+
+    month_names = {
+        "jan": 1,
+        "januar": 1,
+        "feb": 2,
+        "februar": 2,
+        "mär": 3,
+        "märz": 3,
+        "maer": 3,
+        "maerz": 3,
+        "mar": 3,
+        "mrz": 3,
+        "apr": 4,
+        "april": 4,
+        "mai": 5,
+        "jun": 6,
+        "juni": 6,
+        "jul": 7,
+        "juli": 7,
+        "aug": 8,
+        "august": 8,
+        "sep": 9,
+        "sept": 9,
+        "september": 9,
+        "okt": 10,
+        "oktober": 10,
+        "nov": 11,
+        "november": 11,
+        "dez": 12,
+        "dezember": 12,
+    }
+    match = re.search(
+        r"\b(\d{1,2})\.\s*([A-Za-zÄÖÜäöü]+)\.?,?\s*(\d{1,2})[.:](\d{2})",
+        value,
+    )
+    if not match:
+        return None, None
+
+    day = int(match.group(1))
+    month = month_names.get(match.group(2).lower().replace("ä", "ae"))
+    hour = int(match.group(3))
+    minute = int(match.group(4))
+    if month is None:
+        return None, None
+
+    now = datetime.now(AIRPORT_TZ)
+    try:
+        parsed = datetime(now.year, month, day, hour, minute, tzinfo=AIRPORT_TZ)
+    except ValueError:
+        return None, None
+
+    if parsed > now + timedelta(days=1):
+        parsed = parsed.replace(year=parsed.year - 1)
+    duration = max(0, round((now - parsed).total_seconds() / 60))
+    return parsed.isoformat(), duration
 
 
 def _parse_umwelthaus_slots(soup: BeautifulSoup) -> tuple[ForecastSlot, ...]:
