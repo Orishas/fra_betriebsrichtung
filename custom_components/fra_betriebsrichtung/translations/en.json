@@ -4,12 +4,14 @@
     "step": {
       "user": {
         "title": "Configure FRA operating direction",
-        "description": "Choose which operating direction usually causes aircraft noise at your location.",
+        "description": "Choose which operating direction usually causes aircraft noise at your location and how early you want to be warned.",
         "data": {
-          "noise_direction": "Noise-generating operating direction"
+          "noise_direction": "Noise-generating operating direction",
+          "warning_minutes": "Warning time"
         },
         "data_description": {
-          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live."
+          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live.",
+          "warning_minutes": "Minutes before the start of a forecast noise window."
         }
       }
     },
@@ -21,12 +23,14 @@
     "step": {
       "init": {
         "title": "FRA operating direction options",
-        "description": "Change which operating direction usually causes aircraft noise at your location.",
+        "description": "Change which operating direction usually causes aircraft noise at your location and how early you want to be warned.",
         "data": {
-          "noise_direction": "Noise-generating operating direction"
+          "noise_direction": "Noise-generating operating direction",
+          "warning_minutes": "Warning time"
         },
         "data_description": {
-          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live."
+          "noise_direction": "Select the operating direction that usually produces aircraft noise where you live.",
+          "warning_minutes": "Minutes before the start of a forecast noise window."
         }
       }
     }
@@ -49,6 +53,9 @@
       },
       "next_noise": {
         "name": "Next aircraft noise"
+      },
+      "next_direction_change": {
+        "name": "Next direction change"
       }
     },
     "binary_sensor": {
@@ -57,7 +64,19 @@
       },
       "aircraft_noise_forecast": {
         "name": "Aircraft noise forecast"
+      },
+      "aircraft_noise_soon": {
+        "name": "Aircraft noise soon"
+      },
+      "direction_change_forecast": {
+        "name": "Direction change forecast"
       }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh",
+      "description": "Refreshes the FRA operating direction immediately and optionally returns a summary for automations."
     }
   }
 }

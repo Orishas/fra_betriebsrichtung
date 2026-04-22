@@ -4,12 +4,14 @@
     "step": {
       "user": {
         "title": "FRA Betriebsrichtung einrichten",
-        "description": "Wähle aus, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht.",
+        "description": "Wähle aus, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht und wie früh du gewarnt werden möchtest.",
         "data": {
-          "noise_direction": "Lärmverursachende Betriebsrichtung"
+          "noise_direction": "Lärmverursachende Betriebsrichtung",
+          "warning_minutes": "Vorwarnzeit"
         },
         "data_description": {
-          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst."
+          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst.",
+          "warning_minutes": "Minuten vor Beginn eines prognostizierten Lärmfensters."
         }
       }
     },
@@ -21,12 +23,14 @@
     "step": {
       "init": {
         "title": "FRA Betriebsrichtung Optionen",
-        "description": "Ändere, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht.",
+        "description": "Ändere, welche Betriebsrichtung an deinem Standort normalerweise Fluglärm verursacht und wie früh du gewarnt werden möchtest.",
         "data": {
-          "noise_direction": "Lärmverursachende Betriebsrichtung"
+          "noise_direction": "Lärmverursachende Betriebsrichtung",
+          "warning_minutes": "Vorwarnzeit"
         },
         "data_description": {
-          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst."
+          "noise_direction": "Wähle die Betriebsrichtung, bei der du typischerweise Fluglärm wahrnimmst.",
+          "warning_minutes": "Minuten vor Beginn eines prognostizierten Lärmfensters."
         }
       }
     }
@@ -49,6 +53,9 @@
       },
       "next_noise": {
         "name": "Nächster Fluglärm"
+      },
+      "next_direction_change": {
+        "name": "Nächster Richtungswechsel"
       }
     },
     "binary_sensor": {
@@ -57,7 +64,19 @@
       },
       "aircraft_noise_forecast": {
         "name": "Fluglärm Prognose"
+      },
+      "aircraft_noise_soon": {
+        "name": "Fluglärm bald"
+      },
+      "direction_change_forecast": {
+        "name": "Richtungswechsel Prognose"
       }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Aktualisieren",
+      "description": "Aktualisiert die FRA Betriebsrichtung sofort und gibt optional eine Zusammenfassung für Automationen zurück."
     }
   }
 }

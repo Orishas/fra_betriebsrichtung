@@ -30,6 +30,18 @@ class ConfigEntry:
         return cls
 
 
+class ConfigFlow:
+    """Minimal config flow stub."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Accept Home Assistant config flow class keywords."""
+        super().__init_subclass__()
+
+
+class OptionsFlow:
+    """Minimal options flow stub."""
+
+
 class CoordinatorEntity:
     """Minimal coordinator entity stub."""
 
@@ -91,6 +103,8 @@ const.Platform = types.SimpleNamespace(SENSOR="sensor", BINARY_SENSOR="binary_se
 
 core = _module("homeassistant.core")
 core.HomeAssistant = object
+core.ServiceCall = object
+core.SupportsResponse = types.SimpleNamespace(OPTIONAL="optional")
 core.callback = lambda func: func
 
 aiohttp_client = _module("homeassistant.helpers.aiohttp_client")
@@ -103,6 +117,21 @@ update_coordinator = _module("homeassistant.helpers.update_coordinator")
 update_coordinator.CoordinatorEntity = CoordinatorEntity
 update_coordinator.DataUpdateCoordinator = DataUpdateCoordinator
 update_coordinator.UpdateFailed = UpdateFailed
+
+config_entries.ConfigFlow = ConfigFlow
+config_entries.ConfigFlowResult = dict[str, Any]
+config_entries.OptionsFlow = OptionsFlow
+
+selector = _module("homeassistant.helpers.selector")
+selector.NumberSelector = lambda config: lambda value: value
+selector.NumberSelectorConfig = lambda **kwargs: kwargs
+selector.NumberSelectorMode = types.SimpleNamespace(BOX="box")
+selector.SelectSelector = lambda config: lambda value: value
+selector.SelectSelectorConfig = lambda **kwargs: kwargs
+selector.SelectSelectorMode = types.SimpleNamespace(LIST="list")
+
+typing_module = _module("homeassistant.helpers.typing")
+typing_module.ConfigType = dict[str, Any]
 
 util = _module("homeassistant.util")
 dt = _module("homeassistant.util.dt")

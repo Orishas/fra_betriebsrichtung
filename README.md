@@ -18,8 +18,10 @@ to cause aircraft noise at your location.
 3. Local aircraft-noise binary sensor based on your configured noise direction.
 4. Forecast aircraft-noise binary sensor for the next forecast slot.
 5. Next forecast window that matches your local noise direction.
-6. Direction-change event for automations.
-7. Diagnostics with source health and fallback status.
+6. Warning binary sensor for aircraft noise expected soon.
+7. Forecast direction-change binary sensor and timestamp sensor.
+8. Direction-change event and manual refresh action for automations.
+9. Diagnostics with source health and fallback status.
 
 The integration uses public HTML pages only. It does not use hidden or
 undocumented API endpoints.
@@ -32,7 +34,10 @@ undocumented API endpoints.
 | `sensor.fra_betriebsrichtung_forecast` | `BR 07` / `BR 25` | Next forecast direction |
 | `binary_sensor.fra_betriebsrichtung_fluglaerm` | `on` / `off` | Current direction matches your configured noise direction |
 | `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | `on` / `off` | Next forecast slot matches your configured noise direction |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | `on` / `off` | Aircraft noise is forecast within your warning window |
+| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | `on` / `off` | Next forecast slot differs from the current direction |
 | `sensor.fra_betriebsrichtung_naechster_fluglaerm` | timestamp | Start of the next forecast slot matching your noise direction |
+| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | timestamp | Start of the next forecast slot changing direction |
 
 ### Forecast slots
 
@@ -101,9 +106,11 @@ FRA Betriebsrichtung is configured from the Home Assistant UI.
    location:
    - `BR 07`
    - `BR 25`
-5. Submit the setup dialog.
+5. Choose the warning time in minutes for forecast aircraft noise.
+6. Submit the setup dialog.
 
-You can change the noise direction later from the integration options.
+You can change the noise direction and warning time later from the integration
+options.
 
 Only one config entry is supported.
 
@@ -127,6 +134,22 @@ Event data:
 - `next_slot`
 
 The event is not fired during initial setup.
+
+## Service actions
+
+### `fra_betriebsrichtung.refresh`
+
+Refreshes the integration immediately. When called with response data, it
+returns a compact automation-friendly summary:
+
+- `current_direction`
+- `forecast_direction`
+- `noise_active`
+- `forecast_noise_active`
+- `next_noise_slot`
+- `next_direction_change`
+- `source`
+- `last_update`
 
 ## Automation examples
 
@@ -162,6 +185,43 @@ automation:
             {{ state_attr('sensor.fra_betriebsrichtung_forecast', 'next_slot')['from'] }}.
 ```
 
+### Notify before forecast aircraft noise starts
+
+```yaml
+automation:
+  - alias: "FRA aircraft noise soon"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
+        to: "on"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          message: >-
+            FRA aircraft noise is forecast in
+            {{ state_attr('binary_sensor.fra_betriebsrichtung_fluglaerm_bald', 'starts_in_minutes') }}
+            minutes.
+```
+
+### Notify when the forecast changes direction
+
+```yaml
+automation:
+  - alias: "FRA direction change forecast"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast
+        to: "on"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          message: >-
+            FRA forecast changes from
+            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'current_direction') }}
+            to
+            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'forecast_direction') }}.
+```
+
 ### React to direction changes
 
 ```yaml
@@ -178,6 +238,24 @@ automation:
             {{ trigger.event.data.new_direction }}.
 ```
 
+### Refresh before a critical automation
+
+```yaml
+automation:
+  - alias: "FRA refresh before checking noise"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    action:
+      - service: fra_betriebsrichtung.refresh
+        response_variable: fra
+      - condition: template
+        value_template: "{{ fra.noise_active }}"
+      - service: notify.mobile_app_phone
+        data:
+          message: "FRA operating direction currently causes local aircraft noise."
+```
+
 ## Dashboard example
 
 ```yaml
@@ -188,7 +266,10 @@ entities:
   - entity: sensor.fra_betriebsrichtung_forecast
   - entity: binary_sensor.fra_betriebsrichtung_fluglaerm
   - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_forecast
+  - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
+  - entity: binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast
   - entity: sensor.fra_betriebsrichtung_naechster_fluglaerm
+  - entity: sensor.fra_betriebsrichtung_naechster_richtungswechsel
 ```
 
 ## Data sources

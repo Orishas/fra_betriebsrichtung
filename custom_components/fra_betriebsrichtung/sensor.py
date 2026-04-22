@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import FraBetriebsrichtungConfigEntry
 from .const import (
+    ATTR_CURRENT_DIRECTION,
     ATTR_CURRENT_SINCE,
     ATTR_CURRENT_SINCE_START,
     ATTR_CURRENT_DURATION_MINUTES,
@@ -27,6 +28,7 @@ from .const import (
     ATTR_FROM,
     ATTR_LABEL,
     ATTR_LAST_UPDATE,
+    ATTR_NEW_DIRECTION,
     ATTR_NEXT_SLOT,
     ATTR_NEXT_SLOT_LABEL,
     ATTR_NOISE_DIRECTION,
@@ -41,8 +43,10 @@ from .entity import (
     configured_noise_direction,
     device_info,
     health_attributes,
+    next_direction_change_slot,
     next_noise_slot,
     slot_label,
+    slot_start_datetime,
     suggested_object_id,
     without_none,
 )
@@ -130,6 +134,7 @@ async def async_setup_entry(
         FraBetriebsrichtungSensor(coordinator, description) for description in SENSORS
     ]
     entities.append(FraNextNoiseSensor(entry, coordinator))
+    entities.append(FraNextDirectionChangeSensor(coordinator))
     async_add_entities(entities)
 
 
@@ -253,3 +258,67 @@ class FraNextNoiseSensor(
     def _noise_direction(self) -> str:
         """Return the configured local noise direction."""
         return configured_noise_direction(self._entry)
+
+
+class FraNextDirectionChangeSensor(
+    CoordinatorEntity[FraBetriebsrichtungCoordinator],
+    SensorEntity,
+):
+    """Sensor for the next forecasted operating direction change."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    entity_description = SensorEntityDescription(
+        key="naechster_richtungswechsel",
+        translation_key="next_direction_change",
+        icon="mdi:swap-horizontal",
+    )
+
+    def __init__(
+        self,
+        coordinator: FraBetriebsrichtungCoordinator,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{DOMAIN}_naechster_richtungswechsel"
+        self._attr_device_info = device_info()
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Return a stable, language-independent entity object id."""
+        return suggested_object_id("naechster_richtungswechsel")
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return super().available and self.native_value is not None
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the start of the next direction change slot."""
+        slot = next_direction_change_slot(self.coordinator.data)
+        if slot is None:
+            return None
+        return slot_start_datetime(slot)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return entity attributes."""
+        data = self.coordinator.data
+        slot = next_direction_change_slot(data)
+        slot_data = slot.as_dict() if slot else {}
+        return without_none(
+            {
+                ATTR_CURRENT_DIRECTION: data.current_direction if data else None,
+                ATTR_NEW_DIRECTION: slot_data.get("direction"),
+                ATTR_NEXT_SLOT: slot_data or None,
+                ATTR_DIRECTION: slot_data.get("direction"),
+                ATTR_FROM: slot_data.get("from"),
+                ATTR_TO: slot_data.get("to"),
+                ATTR_DATE: slot_data.get("date"),
+                ATTR_END: slot_data.get("end"),
+                ATTR_SOURCE: data.source if data else None,
+                ATTR_LAST_UPDATE: data.last_update if data else None,
+                **(health_attributes(data) if data else {}),
+            }
+        )
