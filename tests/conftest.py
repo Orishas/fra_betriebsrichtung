@@ -85,6 +85,9 @@ _module("homeassistant")
 _module("homeassistant.components")
 _module("homeassistant.helpers")
 
+config_validation = _module("homeassistant.helpers.config_validation")
+config_validation.config_entry_only_config_schema = lambda domain: domain
+
 binary_sensor = _module("homeassistant.components.binary_sensor")
 binary_sensor.BinarySensorEntity = type("BinarySensorEntity", (), {})
 binary_sensor.BinarySensorEntityDescription = EntityDescription
