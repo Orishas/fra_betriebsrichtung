@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 import re
@@ -18,69 +17,12 @@ from .const import (
     SOURCE_FALLBACK,
     SOURCE_UMWELTHAUS,
 )
+from .models import ForecastSlot, FraBetriebsrichtungData, SourceHealth
 
 AIRPORT_TZ = ZoneInfo("Europe/Berlin")
 
 _BR07_RE = re.compile(r"\b(?:BR|Betriebsrichtung)\s*0?7\b|\b07\s*\(Ost\)", re.I)
 _BR25_RE = re.compile(r"\b(?:BR|Betriebsrichtung)\s*25\b|\b25\s*\(West\)", re.I)
-
-
-@dataclass(frozen=True)
-class ForecastSlot:
-    """A normalized forecast period."""
-
-    start: str
-    end: str
-    direction: str
-    date: str | None = None
-    start_iso: str | None = None
-    end_iso: str | None = None
-
-    def as_dict(self) -> dict[str, str]:
-        """Return the Home Assistant attribute representation."""
-        values = {"from": self.start, "to": self.end, "direction": self.direction}
-        if self.date:
-            values["date"] = self.date
-        if self.start_iso:
-            values["start"] = self.start_iso
-        if self.end_iso:
-            values["end"] = self.end_iso
-        return values
-
-
-@dataclass(frozen=True)
-class FraBetriebsrichtungData:
-    """Normalized operating direction data."""
-
-    current_direction: str | None = None
-    current_label: str | None = None
-    current_since: str | None = None
-    current_since_start: str | None = None
-    current_duration_minutes: int | None = None
-    forecast_summary: str | None = None
-    forecast_slots: tuple[ForecastSlot, ...] = ()
-    source: str | None = None
-    last_update: str | None = None
-    primary_ok: bool | None = None
-    fallback_ok: bool | None = None
-    fallback_used: bool = False
-    last_success: str | None = None
-    errors: tuple[str, ...] = ()
-
-    @property
-    def has_current(self) -> bool:
-        """Return whether current direction data is available."""
-        return self.current_direction is not None
-
-    @property
-    def has_forecast(self) -> bool:
-        """Return whether forecast data is available."""
-        return self.forecast_summary is not None or bool(self.forecast_slots)
-
-    @property
-    def has_any_data(self) -> bool:
-        """Return whether this object contains any useful data."""
-        return self.has_current or self.has_forecast
 
 
 def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
@@ -185,7 +127,9 @@ def merge_data(
     )
     source = primary.source
     if uses_fallback and fallback.source:
-        source = f"{primary.source}; {fallback.source}" if primary.source else fallback.source
+        source = (
+            f"{primary.source}; {fallback.source}" if primary.source else fallback.source
+        )
 
     return FraBetriebsrichtungData(
         current_direction=primary.current_direction or fallback.current_direction,
@@ -199,11 +143,7 @@ def merge_data(
         forecast_slots=primary.forecast_slots or fallback.forecast_slots,
         source=source,
         last_update=primary.last_update or fallback.last_update,
-        primary_ok=primary.primary_ok,
-        fallback_ok=fallback.fallback_ok,
-        fallback_used=uses_fallback,
-        last_success=primary.last_success or fallback.last_success,
-        errors=primary.errors or fallback.errors,
+        health=SourceHealth(fallback_used=uses_fallback),
     )
 
 

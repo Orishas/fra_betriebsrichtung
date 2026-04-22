@@ -20,13 +20,16 @@ from .const import (
     ATTR_NEXT_SLOT,
     ATTR_NOISE_DIRECTION,
     ATTR_SOURCE,
-    CONF_NOISE_DIRECTION,
-    DEFAULT_NOISE_DIRECTION,
     DOMAIN,
-    UMWELTHAUS_URL,
 )
 from .coordinator import FraBetriebsrichtungCoordinator
-from .parser import ForecastSlot, FraBetriebsrichtungData
+from .entity import (
+    configured_noise_direction,
+    device_info,
+    first_forecast_slot,
+    slot_matches_direction,
+    suggested_object_id,
+)
 
 
 async def async_setup_entry(
@@ -71,17 +74,12 @@ class FraBetriebsrichtungNoiseSensor(
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_fluglaerm"
-        self._attr_device_info = {
-            "configuration_url": UMWELTHAUS_URL,
-            "identifiers": {(DOMAIN, "frankfurt_airport")},
-            "manufacturer": "FRA Betriebsrichtung",
-            "name": "Frankfurt Airport",
-        }
+        self._attr_device_info = device_info()
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
-        return f"{DOMAIN}_fluglaerm"
+        return suggested_object_id("fluglaerm")
 
     @property
     def available(self) -> bool:
@@ -113,7 +111,7 @@ class FraBetriebsrichtungNoiseSensor(
     @property
     def _noise_direction(self) -> str:
         """Return the configured local noise direction."""
-        return self._entry.options.get(CONF_NOISE_DIRECTION, DEFAULT_NOISE_DIRECTION)
+        return configured_noise_direction(self._entry)
 
 
 class FraBetriebsrichtungForecastNoiseSensor(
@@ -138,36 +136,34 @@ class FraBetriebsrichtungForecastNoiseSensor(
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_fluglaerm_forecast"
-        self._attr_device_info = {
-            "configuration_url": UMWELTHAUS_URL,
-            "identifiers": {(DOMAIN, "frankfurt_airport")},
-            "manufacturer": "FRA Betriebsrichtung",
-            "name": "Frankfurt Airport",
-        }
+        self._attr_device_info = device_info()
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
-        return f"{DOMAIN}_fluglaerm_forecast"
+        return suggested_object_id("fluglaerm_forecast")
 
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return super().available and _next_slot(self.coordinator.data) is not None
+        return (
+            super().available
+            and first_forecast_slot(self.coordinator.data) is not None
+        )
 
     @property
     def is_on(self) -> bool | None:
         """Return true if the next forecast direction matches local noise."""
-        slot = _next_slot(self.coordinator.data)
+        slot = first_forecast_slot(self.coordinator.data)
         if not self.available or slot is None:
             return None
-        return _slot_matches_direction(slot, self._noise_direction)
+        return slot_matches_direction(slot, self._noise_direction)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = _next_slot(data)
+        slot = first_forecast_slot(data)
         return {
             ATTR_NOISE_DIRECTION: self._noise_direction,
             ATTR_FORECAST_DIRECTION: slot.direction if slot else None,
@@ -179,14 +175,4 @@ class FraBetriebsrichtungForecastNoiseSensor(
     @property
     def _noise_direction(self) -> str:
         """Return the configured local noise direction."""
-        return self._entry.options.get(CONF_NOISE_DIRECTION, DEFAULT_NOISE_DIRECTION)
-
-
-def _next_slot(data: FraBetriebsrichtungData | None) -> ForecastSlot | None:
-    if data is None or not data.forecast_slots:
-        return None
-    return data.forecast_slots[0]
-
-
-def _slot_matches_direction(slot: ForecastSlot, direction: str) -> bool:
-    return direction in {part.strip() for part in slot.direction.split("/")}
+        return configured_noise_direction(self._entry)

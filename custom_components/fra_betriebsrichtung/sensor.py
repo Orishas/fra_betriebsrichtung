@@ -24,28 +24,30 @@ from .const import (
     ATTR_DATE,
     ATTR_DIRECTION,
     ATTR_END,
-    ATTR_ERRORS,
-    ATTR_FALLBACK_OK,
-    ATTR_FALLBACK_USED,
     ATTR_FROM,
     ATTR_LABEL,
     ATTR_LAST_UPDATE,
-    ATTR_LAST_SUCCESS,
     ATTR_NEXT_SLOT,
     ATTR_NEXT_SLOT_LABEL,
     ATTR_NOISE_DIRECTION,
-    ATTR_PRIMARY_OK,
     ATTR_SLOTS,
     ATTR_SOURCE,
     ATTR_SUMMARY,
     ATTR_TO,
-    CONF_NOISE_DIRECTION,
-    DEFAULT_NOISE_DIRECTION,
     DOMAIN,
-    UMWELTHAUS_URL,
 )
 from .coordinator import FraBetriebsrichtungCoordinator
-from .parser import ForecastSlot, FraBetriebsrichtungData, normalize_direction
+from .entity import (
+    configured_noise_direction,
+    device_info,
+    health_attributes,
+    next_noise_slot,
+    slot_label,
+    suggested_object_id,
+    without_none,
+)
+from .models import FraBetriebsrichtungData
+from .parser import normalize_direction
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -69,7 +71,7 @@ def _forecast_value(data: FraBetriebsrichtungData) -> str | None:
 
 
 def _current_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
-    return _without_none(
+    return without_none(
         {
             ATTR_LABEL: data.current_label,
             ATTR_SOURCE: data.source,
@@ -77,24 +79,24 @@ def _current_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
             ATTR_CURRENT_SINCE: data.current_since,
             ATTR_CURRENT_SINCE_START: data.current_since_start,
             ATTR_CURRENT_DURATION_MINUTES: data.current_duration_minutes,
-            **_health_attrs(data),
+            **health_attributes(data),
         }
     )
 
 
 def _forecast_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
     next_slot = data.forecast_slots[0].as_dict() if data.forecast_slots else None
-    return _without_none(
+    return without_none(
         {
             ATTR_SUMMARY: data.forecast_summary,
             ATTR_NEXT_SLOT: next_slot,
-            ATTR_NEXT_SLOT_LABEL: _slot_label(data.forecast_slots[0])
+            ATTR_NEXT_SLOT_LABEL: slot_label(data.forecast_slots[0])
             if data.forecast_slots
             else None,
             ATTR_SLOTS: [slot.as_dict() for slot in data.forecast_slots],
             ATTR_SOURCE: data.source,
             ATTR_LAST_UPDATE: data.last_update,
-            **_health_attrs(data),
+            **health_attributes(data),
         }
     )
 
@@ -148,17 +150,12 @@ class FraBetriebsrichtungSensor(
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{DOMAIN}_{description.key}"
-        self._attr_device_info = {
-            "configuration_url": UMWELTHAUS_URL,
-            "identifiers": {(DOMAIN, "frankfurt_airport")},
-            "manufacturer": "FRA Betriebsrichtung",
-            "name": "Frankfurt Airport",
-        }
+        self._attr_device_info = device_info()
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
-        return f"{DOMAIN}_{self.entity_description.key}"
+        return suggested_object_id(self.entity_description.key)
 
     @property
     def available(self) -> bool:
@@ -188,10 +185,6 @@ def _short_state(value: str | None) -> str | None:
     return f"{value[:247]}..."
 
 
-def _without_none(values: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in values.items() if value is not None}
-
-
 class FraNextNoiseSensor(
     CoordinatorEntity[FraBetriebsrichtungCoordinator],
     SensorEntity,
@@ -215,17 +208,12 @@ class FraNextNoiseSensor(
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_naechster_fluglaerm"
-        self._attr_device_info = {
-            "configuration_url": UMWELTHAUS_URL,
-            "identifiers": {(DOMAIN, "frankfurt_airport")},
-            "manufacturer": "FRA Betriebsrichtung",
-            "name": "Frankfurt Airport",
-        }
+        self._attr_device_info = device_info()
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
-        return f"{DOMAIN}_naechster_fluglaerm"
+        return suggested_object_id("naechster_fluglaerm")
 
     @property
     def available(self) -> bool:
@@ -235,7 +223,7 @@ class FraNextNoiseSensor(
     @property
     def native_value(self) -> datetime | None:
         """Return the start of the next noise forecast slot."""
-        slot = _next_noise_slot(self.coordinator.data, self._noise_direction)
+        slot = next_noise_slot(self.coordinator.data, self._noise_direction)
         if slot is None or slot.start_iso is None:
             return None
         return datetime.fromisoformat(slot.start_iso)
@@ -244,9 +232,9 @@ class FraNextNoiseSensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = _next_noise_slot(data, self._noise_direction)
+        slot = next_noise_slot(data, self._noise_direction)
         slot_data = slot.as_dict() if slot else {}
-        return _without_none(
+        return without_none(
             {
                 ATTR_NOISE_DIRECTION: self._noise_direction,
                 ATTR_NEXT_SLOT: slot_data or None,
@@ -257,45 +245,11 @@ class FraNextNoiseSensor(
                 ATTR_END: slot_data.get("end"),
                 ATTR_SOURCE: data.source if data else None,
                 ATTR_LAST_UPDATE: data.last_update if data else None,
-                **(_health_attrs(data) if data else {}),
+                **(health_attributes(data) if data else {}),
             }
         )
 
     @property
     def _noise_direction(self) -> str:
         """Return the configured local noise direction."""
-        return self._entry.options.get(CONF_NOISE_DIRECTION, DEFAULT_NOISE_DIRECTION)
-
-
-def _health_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
-    return {
-        ATTR_PRIMARY_OK: data.primary_ok,
-        ATTR_FALLBACK_OK: data.fallback_ok,
-        ATTR_FALLBACK_USED: data.fallback_used,
-        ATTR_LAST_SUCCESS: data.last_success,
-        ATTR_ERRORS: list(data.errors) or None,
-    }
-
-
-def _slot_label(slot: ForecastSlot) -> str:
-    return f"{slot.direction} von {slot.start} bis {slot.end}"
-
-
-def _next_noise_slot(
-    data: FraBetriebsrichtungData | None,
-    noise_direction: str,
-) -> ForecastSlot | None:
-    if data is None:
-        return None
-    return next(
-        (
-            slot
-            for slot in data.forecast_slots
-            if _slot_matches_direction(slot, noise_direction)
-        ),
-        None,
-    )
-
-
-def _slot_matches_direction(slot: ForecastSlot, direction: str) -> bool:
-    return direction in {part.strip() for part in slot.direction.split("/")}
+        return configured_noise_direction(self._entry)

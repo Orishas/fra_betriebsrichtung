@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from . import FraBetriebsrichtungConfigEntry
 from .const import CONF_NOISE_DIRECTION, DEFAULT_NOISE_DIRECTION, DOMAIN
+from .entity import health_attributes
 
 
 async def async_get_config_entry_diagnostics(
@@ -35,10 +36,6 @@ async def async_get_config_entry_diagnostics(
             "forecast_slots": [slot.as_dict() for slot in data.forecast_slots],
             "source": data.source,
             "last_update": data.last_update,
-            "primary_ok": data.primary_ok,
-            "fallback_ok": data.fallback_ok,
-            "fallback_used": data.fallback_used,
-            "last_success": data.last_success,
-            "errors": list(data.errors),
+            **health_attributes(data, include_empty_errors=True),
         },
     }

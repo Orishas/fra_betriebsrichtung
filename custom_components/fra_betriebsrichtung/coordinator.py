@@ -22,8 +22,8 @@ from .const import (
     UMWELTHAUS_URL,
     UPDATE_INTERVAL,
 )
+from .models import FraBetriebsrichtungData, SourceHealth
 from .parser import (
-    FraBetriebsrichtungData,
     merge_data,
     parse_fallback,
     parse_umwelthaus,
@@ -85,16 +85,18 @@ class FraBetriebsrichtungCoordinator(DataUpdateCoordinator[FraBetriebsrichtungDa
         if data is not None and data.has_any_data:
             data = replace(
                 data,
-                primary_ok=primary is not None and primary.has_any_data,
-                fallback_ok=(
-                    fallback is not None and fallback.has_any_data
-                    if fallback_attempted
-                    else None
+                health=SourceHealth(
+                    primary_ok=primary is not None and primary.has_any_data,
+                    fallback_ok=(
+                        fallback is not None and fallback.has_any_data
+                        if fallback_attempted
+                        else None
+                    ),
+                    fallback_used=(primary is None and fallback is not None)
+                    or data.fallback_used,
+                    last_success=dt_util.now().isoformat(),
+                    errors=tuple(errors),
                 ),
-                fallback_used=(primary is None and fallback is not None)
-                or data.fallback_used,
-                last_success=dt_util.now().isoformat(),
-                errors=tuple(errors),
             )
             self._fire_direction_changed(previous_direction, data)
             return data

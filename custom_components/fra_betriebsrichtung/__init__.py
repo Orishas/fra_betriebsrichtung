@@ -35,6 +35,8 @@ async def async_setup_entry(
         entry,
         async_get_clientsession(hass),
     )
+    # Keep async_refresh here so entities are created as unavailable when
+    # both public sources are temporarily unreachable during setup.
     await coordinator.async_refresh()
 
     entry.runtime_data = FraBetriebsrichtungRuntimeData(coordinator=coordinator)
