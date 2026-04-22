@@ -49,10 +49,10 @@
         "name": "Current operating direction"
       },
       "forecast": {
-        "name": "Forecast operating direction"
+        "name": "Next operating direction"
       },
       "next_noise": {
-        "name": "Next aircraft noise"
+        "name": "Next aircraft noise start"
       },
       "next_direction_change": {
         "name": "Next direction change"
@@ -60,16 +60,16 @@
     },
     "binary_sensor": {
       "aircraft_noise": {
-        "name": "Aircraft noise"
+        "name": "Aircraft noise now"
       },
       "aircraft_noise_forecast": {
-        "name": "Aircraft noise forecast"
+        "name": "Aircraft noise in next slot"
       },
       "aircraft_noise_soon": {
-        "name": "Aircraft noise soon"
+        "name": "Aircraft noise warning"
       },
       "direction_change_forecast": {
-        "name": "Direction change forecast"
+        "name": "Direction change expected"
       }
     }
   },

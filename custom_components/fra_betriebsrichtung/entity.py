@@ -38,7 +38,7 @@ def device_info() -> dict[str, Any]:
         "configuration_url": UMWELTHAUS_URL,
         "identifiers": {(DOMAIN, "frankfurt_airport")},
         "manufacturer": "FRA Betriebsrichtung",
-        "name": "Frankfurt Airport",
+        "name": "FRA",
     }
 
 

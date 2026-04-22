@@ -124,7 +124,7 @@ def test_next_noise_sensor_finds_first_matching_slot() -> None:
 
 
 def test_aircraft_noise_soon_sensor_uses_warning_window(monkeypatch) -> None:
-    """Aircraft noise soon sensor is on inside the configured warning window."""
+    """Aircraft noise warning sensor is on inside the configured warning window."""
     from custom_components.fra_betriebsrichtung import binary_sensor
 
     monkeypatch.setattr(
@@ -150,7 +150,7 @@ def test_aircraft_noise_soon_sensor_uses_warning_window(monkeypatch) -> None:
 def test_aircraft_noise_soon_sensor_is_off_when_noise_is_already_active(
     monkeypatch,
 ) -> None:
-    """Aircraft noise soon sensor is off when current noise is already active."""
+    """Aircraft noise warning sensor is off when current noise is already active."""
     from custom_components.fra_betriebsrichtung import binary_sensor
 
     monkeypatch.setattr(
@@ -171,7 +171,7 @@ def test_aircraft_noise_soon_sensor_is_off_when_noise_is_already_active(
 
 
 def test_direction_change_forecast_sensor_uses_next_slot() -> None:
-    """Direction change forecast is on when the next slot differs."""
+    """Direction change expected is on when the next slot differs."""
     data = _data()
     sensor = FraBetriebsrichtungDirectionChangeForecastSensor(
         SimpleNamespace(data=data)

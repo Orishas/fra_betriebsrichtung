@@ -49,10 +49,10 @@
         "name": "Aktuelle Betriebsrichtung"
       },
       "forecast": {
-        "name": "Betriebsrichtungsprognose"
+        "name": "Nächste Betriebsrichtung"
       },
       "next_noise": {
-        "name": "Nächster Fluglärm"
+        "name": "Nächster Fluglärmbeginn"
       },
       "next_direction_change": {
         "name": "Nächster Richtungswechsel"
@@ -60,16 +60,16 @@
     },
     "binary_sensor": {
       "aircraft_noise": {
-        "name": "Fluglärm"
+        "name": "Fluglärm aktuell"
       },
       "aircraft_noise_forecast": {
-        "name": "Fluglärm Prognose"
+        "name": "Fluglärm im nächsten Slot"
       },
       "aircraft_noise_soon": {
-        "name": "Fluglärm bald"
+        "name": "Fluglärmwarnung"
       },
       "direction_change_forecast": {
-        "name": "Richtungswechsel Prognose"
+        "name": "Richtungswechsel erwartet"
       }
     }
   },

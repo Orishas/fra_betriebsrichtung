@@ -14,7 +14,7 @@ to cause aircraft noise at your location.
 ## Features
 
 1. Current FRA operating direction (`BR 07` or `BR 25`).
-2. Forecast operating direction with dated forecast slots.
+2. Next operating direction with dated forecast slots.
 3. Local aircraft-noise binary sensor based on your configured noise direction.
 4. Forecast aircraft-noise binary sensor for the next forecast slot.
 5. Next forecast window that matches your local noise direction.
@@ -28,16 +28,16 @@ undocumented API endpoints.
 
 ## Entities
 
-| Entity | State | Purpose |
-| --- | --- | --- |
-| `sensor.fra_betriebsrichtung_aktuell` | `BR 07` / `BR 25` | Current operating direction |
-| `sensor.fra_betriebsrichtung_forecast` | `BR 07` / `BR 25` | Next forecast direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm` | `on` / `off` | Current direction matches your configured noise direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | `on` / `off` | Next forecast slot matches your configured noise direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | `on` / `off` | Aircraft noise is forecast within your warning window |
-| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | `on` / `off` | Next forecast slot differs from the current direction |
-| `sensor.fra_betriebsrichtung_naechster_fluglaerm` | timestamp | Start of the next forecast slot matching your noise direction |
-| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | timestamp | Start of the next forecast slot changing direction |
+| Entity | Default UI name | State | Purpose |
+| --- | --- | --- | --- |
+| `sensor.fra_betriebsrichtung_aktuell` | Current operating direction | `BR 07` / `BR 25` | Current operating direction |
+| `sensor.fra_betriebsrichtung_forecast` | Next operating direction | `BR 07` / `BR 25` | Next forecast direction |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm` | Aircraft noise now | `on` / `off` | Current direction matches your configured noise direction |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | Aircraft noise in next slot | `on` / `off` | Next forecast slot matches your configured noise direction |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | Aircraft noise warning | `on` / `off` | Aircraft noise is forecast within your warning window |
+| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | Direction change expected | `on` / `off` | Next forecast slot differs from the current direction |
+| `sensor.fra_betriebsrichtung_naechster_fluglaerm` | Next aircraft noise start | timestamp | Start of the next forecast slot matching your noise direction |
+| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | Next direction change | timestamp | Start of the next forecast slot changing direction |
 
 ### Forecast slots
 
@@ -189,7 +189,7 @@ automation:
 
 ```yaml
 automation:
-  - alias: "FRA aircraft noise soon"
+  - alias: "FRA aircraft noise warning"
     trigger:
       - platform: state
         entity_id: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
@@ -263,13 +263,21 @@ type: entities
 title: FRA Betriebsrichtung
 entities:
   - entity: sensor.fra_betriebsrichtung_aktuell
+    name: Aktuelle Betriebsrichtung
   - entity: sensor.fra_betriebsrichtung_forecast
+    name: Nächste Betriebsrichtung
   - entity: binary_sensor.fra_betriebsrichtung_fluglaerm
+    name: Fluglärm aktuell
   - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_forecast
+    name: Fluglärm im nächsten Slot
   - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
+    name: Fluglärmwarnung
   - entity: binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast
+    name: Richtungswechsel erwartet
   - entity: sensor.fra_betriebsrichtung_naechster_fluglaerm
+    name: Nächster Fluglärmbeginn
   - entity: sensor.fra_betriebsrichtung_naechster_richtungswechsel
+    name: Nächster Richtungswechsel
 ```
 
 ## Data sources
