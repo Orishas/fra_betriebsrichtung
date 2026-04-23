@@ -11,6 +11,15 @@ direction at Frankfurt Airport (FRA).
 It helps you see whether the active or forecast operating direction is likely
 to cause aircraft noise at your location.
 
+## Which entity do I need?
+
+| Question | Use this entity |
+| --- | --- |
+| Aircraft noise right now? | `binary_sensor.fra_betriebsrichtung_fluglaerm` (Aircraft noise now) |
+| Aircraft noise soon? | `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` (Aircraft noise warning) |
+| When does the next aircraft noise start? | `sensor.fra_betriebsrichtung_naechster_fluglaerm` (Next aircraft noise start) |
+| Is the operating direction expected to change? | `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` (Direction change expected) |
+
 ## Features
 
 1. Current FRA operating direction (`BR 07` or `BR 25`).
