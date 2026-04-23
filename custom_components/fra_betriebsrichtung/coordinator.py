@@ -22,6 +22,7 @@ from .const import (
     UMWELTHAUS_URL,
     UPDATE_INTERVAL,
 )
+from .entity import first_forecast_slot
 from .models import FraBetriebsrichtungData, SourceHealth
 from .parser import (
     merge_data,
@@ -123,6 +124,7 @@ class FraBetriebsrichtungCoordinator(DataUpdateCoordinator[FraBetriebsrichtungDa
         if previous_direction == current_direction:
             return
 
+        next_slot = first_forecast_slot(data)
         noise_direction = self._entry.options.get(
             CONF_NOISE_DIRECTION,
             DEFAULT_NOISE_DIRECTION,
@@ -137,8 +139,6 @@ class FraBetriebsrichtungCoordinator(DataUpdateCoordinator[FraBetriebsrichtungDa
                 "source": data.source,
                 "last_update": data.last_update,
                 "current_since": data.current_since,
-                "next_slot": data.forecast_slots[0].as_dict()
-                if data.forecast_slots
-                else None,
+                "next_slot": next_slot.as_dict() if next_slot else None,
             },
         )

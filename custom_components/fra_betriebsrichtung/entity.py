@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from math import ceil
 from typing import Any
@@ -63,43 +64,42 @@ def suggested_object_id(key: str) -> str:
     return f"{DOMAIN}_{key}"
 
 
-def first_forecast_slot(data: FraBetriebsrichtungData | None) -> ForecastSlot | None:
-    """Return the first forecast slot."""
+def first_forecast_slot(
+    data: FraBetriebsrichtungData | None,
+    now: datetime | None = None,
+) -> ForecastSlot | None:
+    """Return the first upcoming forecast slot."""
     if data is None or not data.forecast_slots:
         return None
-    return data.forecast_slots[0]
+    return _first_matching_slot(data.forecast_slots, now or _now())
 
 
 def next_noise_slot(
     data: FraBetriebsrichtungData | None,
     noise_direction: str,
+    now: datetime | None = None,
 ) -> ForecastSlot | None:
-    """Return the first forecast slot matching the local noise direction."""
+    """Return the next forecast slot matching the local noise direction."""
     if data is None:
         return None
-    return next(
-        (
-            slot
-            for slot in data.forecast_slots
-            if slot_matches_direction(slot, noise_direction)
-        ),
-        None,
+    return _first_matching_slot(
+        data.forecast_slots,
+        now or _now(),
+        lambda slot: slot_matches_direction(slot, noise_direction),
     )
 
 
 def next_direction_change_slot(
     data: FraBetriebsrichtungData | None,
+    now: datetime | None = None,
 ) -> ForecastSlot | None:
-    """Return the first forecast slot that differs from the current direction."""
+    """Return the next forecast slot that differs from the current direction."""
     if data is None or data.current_direction is None:
         return None
-    return next(
-        (
-            slot
-            for slot in data.forecast_slots
-            if not slot_matches_direction(slot, data.current_direction)
-        ),
-        None,
+    return _first_matching_slot(
+        data.forecast_slots,
+        now or _now(),
+        lambda slot: not slot_matches_direction(slot, data.current_direction),
     )
 
 
@@ -111,14 +111,10 @@ def next_upcoming_noise_slot(
     """Return the first future noise slot."""
     if data is None:
         return None
-    return next(
-        (
-            slot
-            for slot in data.forecast_slots
-            if slot_matches_direction(slot, noise_direction)
-            and _is_upcoming(slot, now)
-        ),
-        None,
+    return _first_matching_slot(
+        data.forecast_slots,
+        now,
+        lambda slot: slot_matches_direction(slot, noise_direction),
     )
 
 
@@ -131,7 +127,10 @@ def slot_start_datetime(slot: ForecastSlot) -> datetime | None:
     """Return the slot start as datetime."""
     if slot.start_iso is None:
         return None
-    return datetime.fromisoformat(slot.start_iso)
+    try:
+        return datetime.fromisoformat(slot.start_iso)
+    except ValueError:
+        return None
 
 
 def slot_matches_direction(slot: ForecastSlot, direction: str) -> bool:
@@ -147,9 +146,28 @@ def starts_in_minutes(slot: ForecastSlot, now: datetime) -> int | None:
     return ceil((start - now).total_seconds() / 60)
 
 
+def _first_matching_slot(
+    slots: tuple[ForecastSlot, ...],
+    now: datetime,
+    predicate: Callable[[ForecastSlot], bool] | None = None,
+) -> ForecastSlot | None:
+    matching_slots = [slot for slot in slots if predicate is None or predicate(slot)]
+    for slot in matching_slots:
+        if _is_upcoming(slot, now):
+            return slot
+    return next(
+        (slot for slot in matching_slots if slot_start_datetime(slot) is None),
+        None,
+    )
+
+
 def _is_upcoming(slot: ForecastSlot, now: datetime) -> bool:
-    minutes = starts_in_minutes(slot, now)
-    return minutes is not None and minutes >= 0
+    start = slot_start_datetime(slot)
+    return start is not None and start >= now
+
+
+def _now() -> datetime:
+    return datetime.now().astimezone()
 
 
 def without_none(values: dict[str, Any]) -> dict[str, Any]:

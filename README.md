@@ -26,6 +26,13 @@ to cause aircraft noise at your location.
 The integration uses public HTML pages only. It does not use hidden or
 undocumented API endpoints.
 
+## Breaking changes in v0.4.0
+
+Entity attributes were cleaned up. Source-health fields such as `primary_ok`,
+`fallback_ok`, `fallback_used`, `last_success`, and `errors` are now available
+only in diagnostics. The direction-change forecast binary sensor now exposes
+`new_direction` instead of `forecast_direction`.
+
 ## Entities
 
 | Entity | Default UI name | State | Purpose |
@@ -64,10 +71,19 @@ Useful attributes include:
 - `slots`
 - `source`
 - `last_update`
-- `primary_ok`
-- `fallback_ok`
-- `fallback_used`
-- `last_success`
+
+### Entity attributes
+
+| Entity | Attributes |
+| --- | --- |
+| `sensor.fra_betriebsrichtung_aktuell` | `label`, `current_since`, `current_since_start`, `current_duration_minutes`, `source`, `last_update` |
+| `sensor.fra_betriebsrichtung_forecast` | `summary`, `next_slot`, `next_slot_label`, `slots`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm` | `noise_direction`, `current_direction`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | `noise_direction`, `forecast_direction`, `next_slot`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | `warning_minutes`, `starts_in_minutes`, `noise_direction`, `next_slot`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | `current_direction`, `new_direction`, `next_slot`, `source`, `last_update` |
+| `sensor.fra_betriebsrichtung_naechster_fluglaerm` | `noise_direction`, `direction`, `from`, `to`, `date`, `end`, `source`, `last_update` |
+| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | `current_direction`, `new_direction`, `from`, `to`, `date`, `end`, `source`, `last_update` |
 
 ## Installation
 
@@ -151,6 +167,9 @@ returns a compact automation-friendly summary:
 - `source`
 - `last_update`
 
+If no config entry is loaded or the refresh fails, the action raises a Home
+Assistant error so automations do not continue with stale data.
+
 ## Automation examples
 
 ### Notify when aircraft noise starts
@@ -219,7 +238,7 @@ automation:
             FRA forecast changes from
             {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'current_direction') }}
             to
-            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'forecast_direction') }}.
+            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'new_direction') }}.
 ```
 
 ### React to direction changes
@@ -303,8 +322,8 @@ from HACS and restart Home Assistant so the updated Python code is loaded.
 
 - If the entities are unavailable, check the integration diagnostics from
   **Settings > Devices & services**.
-- `fallback_used: true` means the primary source was incomplete and the
-  fallback source supplied missing data.
+- In diagnostics, `fallback_used: true` means the primary source was incomplete
+  and the fallback source supplied missing data.
 - Website structures can change. Parser failures are handled gracefully, and the
   integration does not invent operating direction data.
 

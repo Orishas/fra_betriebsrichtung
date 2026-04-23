@@ -15,6 +15,7 @@ from homeassistant.components.sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import FraBetriebsrichtungConfigEntry
 from .const import (
@@ -42,7 +43,7 @@ from .coordinator import FraBetriebsrichtungCoordinator
 from .entity import (
     configured_noise_direction,
     device_info,
-    health_attributes,
+    first_forecast_slot,
     next_direction_change_slot,
     next_noise_slot,
     slot_label,
@@ -68,7 +69,8 @@ def _current_value(data: FraBetriebsrichtungData) -> str | None:
 
 def _forecast_value(data: FraBetriebsrichtungData) -> str | None:
     if data.forecast_slots:
-        return data.forecast_slots[0].direction
+        slot = first_forecast_slot(data, dt_util.now())
+        return slot.direction if slot else None
     if direction := normalize_direction(data.forecast_summary):
         return direction
     return _short_state(data.forecast_summary)
@@ -83,24 +85,21 @@ def _current_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
             ATTR_CURRENT_SINCE: data.current_since,
             ATTR_CURRENT_SINCE_START: data.current_since_start,
             ATTR_CURRENT_DURATION_MINUTES: data.current_duration_minutes,
-            **health_attributes(data),
         }
     )
 
 
 def _forecast_attrs(data: FraBetriebsrichtungData) -> dict[str, Any]:
-    next_slot = data.forecast_slots[0].as_dict() if data.forecast_slots else None
+    slot = first_forecast_slot(data, dt_util.now())
+    next_slot = slot.as_dict() if slot else None
     return without_none(
         {
             ATTR_SUMMARY: data.forecast_summary,
             ATTR_NEXT_SLOT: next_slot,
-            ATTR_NEXT_SLOT_LABEL: slot_label(data.forecast_slots[0])
-            if data.forecast_slots
-            else None,
+            ATTR_NEXT_SLOT_LABEL: slot_label(slot) if slot else None,
             ATTR_SLOTS: [slot.as_dict() for slot in data.forecast_slots],
             ATTR_SOURCE: data.source,
             ATTR_LAST_UPDATE: data.last_update,
-            **health_attributes(data),
         }
     )
 
@@ -228,7 +227,11 @@ class FraNextNoiseSensor(
     @property
     def native_value(self) -> datetime | None:
         """Return the start of the next noise forecast slot."""
-        slot = next_noise_slot(self.coordinator.data, self._noise_direction)
+        slot = next_noise_slot(
+            self.coordinator.data,
+            self._noise_direction,
+            dt_util.now(),
+        )
         if slot is None or slot.start_iso is None:
             return None
         return datetime.fromisoformat(slot.start_iso)
@@ -237,12 +240,11 @@ class FraNextNoiseSensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = next_noise_slot(data, self._noise_direction)
+        slot = next_noise_slot(data, self._noise_direction, dt_util.now())
         slot_data = slot.as_dict() if slot else {}
         return without_none(
             {
                 ATTR_NOISE_DIRECTION: self._noise_direction,
-                ATTR_NEXT_SLOT: slot_data or None,
                 ATTR_DIRECTION: slot_data.get("direction"),
                 ATTR_FROM: slot_data.get("from"),
                 ATTR_TO: slot_data.get("to"),
@@ -250,7 +252,6 @@ class FraNextNoiseSensor(
                 ATTR_END: slot_data.get("end"),
                 ATTR_SOURCE: data.source if data else None,
                 ATTR_LAST_UPDATE: data.last_update if data else None,
-                **(health_attributes(data) if data else {}),
             }
         )
 
@@ -296,7 +297,7 @@ class FraNextDirectionChangeSensor(
     @property
     def native_value(self) -> datetime | None:
         """Return the start of the next direction change slot."""
-        slot = next_direction_change_slot(self.coordinator.data)
+        slot = next_direction_change_slot(self.coordinator.data, dt_util.now())
         if slot is None:
             return None
         return slot_start_datetime(slot)
@@ -305,20 +306,17 @@ class FraNextDirectionChangeSensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = next_direction_change_slot(data)
+        slot = next_direction_change_slot(data, dt_util.now())
         slot_data = slot.as_dict() if slot else {}
         return without_none(
             {
                 ATTR_CURRENT_DIRECTION: data.current_direction if data else None,
                 ATTR_NEW_DIRECTION: slot_data.get("direction"),
-                ATTR_NEXT_SLOT: slot_data or None,
-                ATTR_DIRECTION: slot_data.get("direction"),
                 ATTR_FROM: slot_data.get("from"),
                 ATTR_TO: slot_data.get("to"),
                 ATTR_DATE: slot_data.get("date"),
                 ATTR_END: slot_data.get("end"),
                 ATTR_SOURCE: data.source if data else None,
                 ATTR_LAST_UPDATE: data.last_update if data else None,
-                **(health_attributes(data) if data else {}),
             }
         )

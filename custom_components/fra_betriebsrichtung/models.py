@@ -35,7 +35,7 @@ class SourceHealth:
     primary_ok: bool | None = None
     fallback_ok: bool | None = None
     fallback_used: bool = False
-    last_success: str | None = None
+    last_success: str | None = field(default=None, compare=False)
     errors: tuple[str, ...] = ()
 
 

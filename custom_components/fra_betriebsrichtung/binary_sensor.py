@@ -18,6 +18,7 @@ from .const import (
     ATTR_CURRENT_DIRECTION,
     ATTR_FORECAST_DIRECTION,
     ATTR_LAST_UPDATE,
+    ATTR_NEW_DIRECTION,
     ATTR_NEXT_SLOT,
     ATTR_NOISE_DIRECTION,
     ATTR_SOURCE,
@@ -161,13 +162,13 @@ class FraBetriebsrichtungForecastNoiseSensor(
         """Return if entity is available."""
         return (
             super().available
-            and first_forecast_slot(self.coordinator.data) is not None
+            and first_forecast_slot(self.coordinator.data, dt_util.now()) is not None
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return true if the next forecast direction matches local noise."""
-        slot = first_forecast_slot(self.coordinator.data)
+        slot = first_forecast_slot(self.coordinator.data, dt_util.now())
         if not self.available or slot is None:
             return None
         return slot_matches_direction(slot, self._noise_direction)
@@ -176,7 +177,7 @@ class FraBetriebsrichtungForecastNoiseSensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = first_forecast_slot(data)
+        slot = first_forecast_slot(data, dt_util.now())
         return {
             ATTR_NOISE_DIRECTION: self._noise_direction,
             ATTR_FORECAST_DIRECTION: slot.direction if slot else None,
@@ -312,14 +313,14 @@ class FraBetriebsrichtungDirectionChangeForecastSensor(
             super().available
             and data is not None
             and data.current_direction is not None
-            and first_forecast_slot(data) is not None
+            and first_forecast_slot(data, dt_util.now()) is not None
         )
 
     @property
     def is_on(self) -> bool | None:
         """Return true if the next forecast slot differs from the current direction."""
         data = self.coordinator.data
-        slot = first_forecast_slot(data)
+        slot = first_forecast_slot(data, dt_util.now())
         if not self.available or data is None or slot is None:
             return None
         return not slot_matches_direction(slot, data.current_direction)
@@ -328,10 +329,10 @@ class FraBetriebsrichtungDirectionChangeForecastSensor(
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        slot = first_forecast_slot(data)
+        slot = first_forecast_slot(data, dt_util.now())
         return {
             ATTR_CURRENT_DIRECTION: data.current_direction if data else None,
-            ATTR_FORECAST_DIRECTION: slot.direction if slot else None,
+            ATTR_NEW_DIRECTION: slot.direction if slot else None,
             ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
             ATTR_SOURCE: data.source if data else None,
             ATTR_LAST_UPDATE: data.last_update if data else None,

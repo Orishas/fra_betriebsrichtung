@@ -121,6 +121,9 @@ update_coordinator.CoordinatorEntity = CoordinatorEntity
 update_coordinator.DataUpdateCoordinator = DataUpdateCoordinator
 update_coordinator.UpdateFailed = UpdateFailed
 
+exceptions = _module("homeassistant.exceptions")
+exceptions.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+
 config_entries.ConfigFlow = ConfigFlow
 config_entries.ConfigFlowResult = dict[str, Any]
 config_entries.OptionsFlow = OptionsFlow

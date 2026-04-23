@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
@@ -106,24 +107,14 @@ async def _async_handle_refresh(
     entry = _loaded_entry(hass)
     return_response = getattr(call, "return_response", False)
     if entry is None:
-        return (
-            _refresh_response(None, None, error="no_loaded_config_entry")
-            if return_response
-            else None
-        )
+        raise HomeAssistantError("FRA Betriebsrichtung has no loaded config entry")
 
     coordinator = entry.runtime_data.coordinator
     try:
         await coordinator.async_request_refresh()
     except Exception as err:  # noqa: BLE001 - action should be automation-friendly
         _LOGGER.debug("Manual refresh failed", exc_info=err)
-        if return_response:
-            return _refresh_response(
-                coordinator.data,
-                configured_noise_direction(entry),
-                error=str(err),
-            )
-        return None
+        raise HomeAssistantError("Failed to refresh FRA Betriebsrichtung") from err
 
     if return_response:
         return _refresh_response(coordinator.data, configured_noise_direction(entry))
@@ -138,8 +129,6 @@ def _loaded_entry(hass: HomeAssistant) -> FraBetriebsrichtungConfigEntry | None:
 def _refresh_response(
     data: FraBetriebsrichtungData | None,
     noise_direction: str | None,
-    *,
-    error: str | None = None,
 ) -> dict[str, Any]:
     first_slot = first_forecast_slot(data)
     next_noise = (
@@ -164,6 +153,4 @@ def _refresh_response(
         "source": data.source if data else None,
         "last_update": data.last_update if data else None,
     }
-    if error is not None:
-        response["error"] = error
     return response

@@ -7,7 +7,13 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from . import FraBetriebsrichtungConfigEntry
-from .const import CONF_NOISE_DIRECTION, DEFAULT_NOISE_DIRECTION, DOMAIN
+from .const import (
+    CONF_NOISE_DIRECTION,
+    CONF_WARNING_MINUTES,
+    DEFAULT_NOISE_DIRECTION,
+    DEFAULT_WARNING_MINUTES,
+    DOMAIN,
+)
 from .entity import health_attributes
 
 
@@ -23,6 +29,10 @@ async def async_get_config_entry_diagnostics(
             CONF_NOISE_DIRECTION: entry.options.get(
                 CONF_NOISE_DIRECTION,
                 DEFAULT_NOISE_DIRECTION,
+            ),
+            CONF_WARNING_MINUTES: entry.options.get(
+                CONF_WARNING_MINUTES,
+                DEFAULT_WARNING_MINUTES,
             ),
         },
         "data": None

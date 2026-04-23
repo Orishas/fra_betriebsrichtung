@@ -8,5 +8,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Orishas/fra_betriebsrichtung/issues",
   "requirements": ["beautifulsoup4==4.13.3"],
-  "version": "0.3.1"
+  "version": "0.4.0"
 }
