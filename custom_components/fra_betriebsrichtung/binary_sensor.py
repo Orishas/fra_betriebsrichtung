@@ -39,8 +39,14 @@ from .models import FraBetriebsrichtungData
 
 
 @dataclass(frozen=True)
-class BinarySensorContext:
-    """Per-entity configuration injected into description callables."""
+class BinarySensorRenderConfig:
+    """Per-entity configuration injected into description callables.
+
+    Intentionally *not* named ``BinarySensorContext`` and *not* exposed as
+    ``Entity._context`` — that name is reserved by Home Assistant's
+    ``Entity`` base class for the state-change ``homeassistant.core.Context``.
+    Shadowing it produces AttributeError crashes during state serialisation.
+    """
 
     noise_direction: str
     warning_minutes: int
@@ -50,8 +56,10 @@ class BinarySensorContext:
 class FraBinarySensorEntityDescription(BinarySensorEntityDescription):
     """Describes a FRA Betriebsrichtung binary sensor."""
 
-    is_on_fn: Callable[[FraBetriebsrichtungData, BinarySensorContext], bool | None]
-    attrs_fn: Callable[[FraBetriebsrichtungData, BinarySensorContext], dict[str, Any]]
+    is_on_fn: Callable[[FraBetriebsrichtungData, BinarySensorRenderConfig], bool | None]
+    attrs_fn: Callable[
+        [FraBetriebsrichtungData, BinarySensorRenderConfig], dict[str, Any]
+    ]
     available_fn: Callable[[FraBetriebsrichtungData | None], bool] = (
         lambda data: data is not None and data.current_direction is not None
     )
@@ -59,17 +67,17 @@ class FraBinarySensorEntityDescription(BinarySensorEntityDescription):
 
 def _aircraft_noise_is_on(
     data: FraBetriebsrichtungData,
-    context: BinarySensorContext,
+    config: BinarySensorRenderConfig,
 ) -> bool:
-    return data.current_direction == context.noise_direction
+    return data.current_direction == config.noise_direction
 
 
 def _aircraft_noise_attrs(
     data: FraBetriebsrichtungData,
-    context: BinarySensorContext,
+    config: BinarySensorRenderConfig,
 ) -> dict[str, Any]:
     return {
-        ATTR_NOISE_DIRECTION: context.noise_direction,
+        ATTR_NOISE_DIRECTION: config.noise_direction,
         ATTR_CURRENT_DIRECTION: data.current_direction,
         ATTR_SOURCE: data.source,
         ATTR_LAST_UPDATE: data.last_update,
@@ -78,28 +86,28 @@ def _aircraft_noise_attrs(
 
 def _aircraft_noise_warning_is_on(
     data: FraBetriebsrichtungData,
-    context: BinarySensorContext,
+    config: BinarySensorRenderConfig,
 ) -> bool:
-    if data.current_direction == context.noise_direction:
+    if data.current_direction == config.noise_direction:
         return False
     now = dt_util.now()
-    slot = next_noise_slot(data, context.noise_direction, now)
+    slot = next_noise_slot(data, config.noise_direction, now)
     if slot is None:
         return False
     minutes_until = starts_in_minutes(slot, now)
-    return minutes_until is not None and minutes_until <= context.warning_minutes
+    return minutes_until is not None and minutes_until <= config.warning_minutes
 
 
 def _aircraft_noise_warning_attrs(
     data: FraBetriebsrichtungData,
-    context: BinarySensorContext,
+    config: BinarySensorRenderConfig,
 ) -> dict[str, Any]:
     now = dt_util.now()
-    slot = next_noise_slot(data, context.noise_direction, now)
+    slot = next_noise_slot(data, config.noise_direction, now)
     return {
-        ATTR_WARNING_MINUTES: context.warning_minutes,
+        ATTR_WARNING_MINUTES: config.warning_minutes,
         ATTR_STARTS_IN_MINUTES: starts_in_minutes(slot, now) if slot else None,
-        ATTR_NOISE_DIRECTION: context.noise_direction,
+        ATTR_NOISE_DIRECTION: config.noise_direction,
         ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
         ATTR_SOURCE: data.source,
         ATTR_LAST_UPDATE: data.last_update,
@@ -158,18 +166,18 @@ class FraBinarySensor(
         self.entity_description = description
         self._attr_unique_id = f"{DOMAIN}_{description.key}"
         self._attr_device_info = device_info()
+        # Cache the per-entity render config once. Must not be exposed as
+        # ``_context`` — that attribute name is owned by Entity for the HA
+        # state-change Context.
+        self._render_config = BinarySensorRenderConfig(
+            noise_direction=configured_noise_direction(entry),
+            warning_minutes=configured_warning_minutes(entry),
+        )
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
         return suggested_object_id(self.entity_description.key)
-
-    @property
-    def _context(self) -> BinarySensorContext:
-        return BinarySensorContext(
-            noise_direction=configured_noise_direction(self._entry),
-            warning_minutes=configured_warning_minutes(self._entry),
-        )
 
     @property
     def available(self) -> bool:
@@ -183,7 +191,9 @@ class FraBinarySensor(
         """Return the binary sensor state."""
         if not self.available or self.coordinator.data is None:
             return None
-        return self.entity_description.is_on_fn(self.coordinator.data, self._context)
+        return self.entity_description.is_on_fn(
+            self.coordinator.data, self._render_config
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -191,4 +201,4 @@ class FraBinarySensor(
         data = self.coordinator.data
         if data is None:
             return {}
-        return self.entity_description.attrs_fn(data, self._context)
+        return self.entity_description.attrs_fn(data, self._render_config)
