@@ -45,31 +45,22 @@
   },
   "entity": {
     "sensor": {
-      "current": {
-        "name": "Current operating direction"
+      "current_direction": {
+        "name": "Operating direction"
       },
       "forecast": {
-        "name": "Next operating direction"
+        "name": "Forecast"
       },
-      "next_noise": {
-        "name": "Next aircraft noise start"
-      },
-      "next_direction_change": {
-        "name": "Next direction change"
+      "next_aircraft_noise": {
+        "name": "Next aircraft noise"
       }
     },
     "binary_sensor": {
       "aircraft_noise": {
-        "name": "Aircraft noise now"
+        "name": "Aircraft noise"
       },
-      "aircraft_noise_forecast": {
-        "name": "Aircraft noise in next slot"
-      },
-      "aircraft_noise_soon": {
+      "aircraft_noise_warning": {
         "name": "Aircraft noise warning"
-      },
-      "direction_change_forecast": {
-        "name": "Direction change expected"
       }
     }
   },

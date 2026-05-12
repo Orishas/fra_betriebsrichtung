@@ -138,7 +138,6 @@ class FraBetriebsrichtungCoordinator(DataUpdateCoordinator[FraBetriebsrichtungDa
                 "noise_active": current_direction == noise_direction,
                 "source": data.source,
                 "last_update": data.last_update,
-                "current_since": data.current_since,
                 "next_slot": next_slot.as_dict() if next_slot else None,
             },
         )

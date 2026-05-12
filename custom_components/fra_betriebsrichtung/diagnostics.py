@@ -39,7 +39,6 @@ async def async_get_config_entry_diagnostics(
         if data is None
         else {
             "current_direction": data.current_direction,
-            "current_since": data.current_since,
             "current_since_start": data.current_since_start,
             "current_duration_minutes": data.current_duration_minutes,
             "forecast_summary": data.forecast_summary,

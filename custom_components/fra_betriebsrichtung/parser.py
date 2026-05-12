@@ -43,7 +43,6 @@ def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
     data = FraBetriebsrichtungData(
         current_direction=current_direction,
         current_label=current_label,
-        current_since=current_since,
         current_since_start=current_since_start,
         current_duration_minutes=current_duration_minutes,
         forecast_summary=forecast_summary,
@@ -134,7 +133,6 @@ def merge_data(
     return FraBetriebsrichtungData(
         current_direction=primary.current_direction or fallback.current_direction,
         current_label=primary.current_label or fallback.current_label,
-        current_since=primary.current_since or fallback.current_since,
         current_since_start=primary.current_since_start or fallback.current_since_start,
         current_duration_minutes=primary.current_duration_minutes
         if primary.current_duration_minutes is not None

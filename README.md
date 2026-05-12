@@ -6,59 +6,30 @@
 [![Hassfest](https://github.com/Orishas/fra_betriebsrichtung/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Orishas/fra_betriebsrichtung/actions/workflows/hassfest.yml)
 
 Home Assistant custom integration for the current and forecast operating
-direction at Frankfurt Airport (FRA).
-
-It helps you see whether the active or forecast operating direction is likely
-to cause aircraft noise at your location.
-
-## Which entity do I need?
-
-| Question | Use this entity |
-| --- | --- |
-| Aircraft noise right now? | `binary_sensor.fra_betriebsrichtung_fluglaerm` (Aircraft noise now) |
-| Aircraft noise soon? | `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` (Aircraft noise warning) |
-| When does the next aircraft noise start? | `sensor.fra_betriebsrichtung_naechster_fluglaerm` (Next aircraft noise start) |
-| Is the operating direction expected to change? | `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` (Direction change expected) |
-
-## Features
-
-1. Current FRA operating direction (`BR 07` or `BR 25`).
-2. Next operating direction with dated forecast slots.
-3. Local aircraft-noise binary sensor based on your configured noise direction.
-4. Forecast aircraft-noise binary sensor for the next forecast slot.
-5. Next forecast window that matches your local noise direction.
-6. Warning binary sensor for aircraft noise expected soon.
-7. Forecast direction-change binary sensor and timestamp sensor.
-8. Direction-change event and manual refresh action for automations.
-9. Diagnostics with source health and fallback status.
-
-The integration uses public HTML pages only. It does not use hidden or
-undocumented API endpoints.
-
-## Breaking changes in v0.4.0
-
-Entity attributes were cleaned up. Source-health fields such as `primary_ok`,
-`fallback_ok`, `fallback_used`, `last_success`, and `errors` are now available
-only in diagnostics. The direction-change forecast binary sensor now exposes
-`new_direction` instead of `forecast_direction`.
+direction at Frankfurt Airport (FRA), with a noise indicator for your location.
 
 ## Entities
 
 | Entity | Default UI name | State | Purpose |
 | --- | --- | --- | --- |
-| `sensor.fra_betriebsrichtung_aktuell` | Current operating direction | `BR 07` / `BR 25` | Current operating direction |
-| `sensor.fra_betriebsrichtung_forecast` | Next operating direction | `BR 07` / `BR 25` | Next forecast direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm` | Aircraft noise now | `on` / `off` | Current direction matches your configured noise direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | Aircraft noise in next slot | `on` / `off` | Next forecast slot matches your configured noise direction |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | Aircraft noise warning | `on` / `off` | Aircraft noise is forecast within your warning window |
-| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | Direction change expected | `on` / `off` | Next forecast slot differs from the current direction |
-| `sensor.fra_betriebsrichtung_naechster_fluglaerm` | Next aircraft noise start | timestamp | Start of the next forecast slot matching your noise direction |
-| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | Next direction change | timestamp | Start of the next forecast slot changing direction |
+| `sensor.fra_betriebsrichtung_current_direction` | Operating direction | `BR 07` / `BR 25` | Current operating direction |
+| `sensor.fra_betriebsrichtung_forecast` | Forecast | `BR 07` / `BR 25` | Direction of the next forecast slot, with all upcoming slots as attributes |
+| `sensor.fra_betriebsrichtung_next_aircraft_noise` | Next aircraft noise | timestamp | Start of the next forecast slot matching your noise direction |
+| `binary_sensor.fra_betriebsrichtung_aircraft_noise` | Aircraft noise | `on` / `off` | Current direction matches your configured noise direction |
+| `binary_sensor.fra_betriebsrichtung_aircraft_noise_warning` | Aircraft noise warning | `on` / `off` | Aircraft noise is forecast within your warning window |
 
-### Forecast slots
+### Entity attributes
 
-Forecast slots are exposed as attributes on
-`sensor.fra_betriebsrichtung_forecast`.
+| Entity | Attributes |
+| --- | --- |
+| `sensor.fra_betriebsrichtung_current_direction` | `label`, `current_since_start`, `current_duration_minutes`, `source`, `last_update` |
+| `sensor.fra_betriebsrichtung_forecast` | `next_slot`, `slots`, `source`, `last_update` |
+| `sensor.fra_betriebsrichtung_next_aircraft_noise` | `noise_direction`, `direction`, `from`, `to`, `date`, `end`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_aircraft_noise` | `noise_direction`, `current_direction`, `source`, `last_update` |
+| `binary_sensor.fra_betriebsrichtung_aircraft_noise_warning` | `warning_minutes`, `starts_in_minutes`, `noise_direction`, `next_slot`, `source`, `last_update` |
+
+The `slots` attribute on the forecast sensor contains all upcoming forecast
+periods:
 
 ```json
 [
@@ -73,27 +44,6 @@ Forecast slots are exposed as attributes on
 ]
 ```
 
-Useful attributes include:
-
-- `next_slot`
-- `next_slot_label`
-- `slots`
-- `source`
-- `last_update`
-
-### Entity attributes
-
-| Entity | Attributes |
-| --- | --- |
-| `sensor.fra_betriebsrichtung_aktuell` | `label`, `current_since`, `current_since_start`, `current_duration_minutes`, `source`, `last_update` |
-| `sensor.fra_betriebsrichtung_forecast` | `summary`, `next_slot`, `next_slot_label`, `slots`, `source`, `last_update` |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm` | `noise_direction`, `current_direction`, `source`, `last_update` |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_forecast` | `noise_direction`, `forecast_direction`, `next_slot`, `source`, `last_update` |
-| `binary_sensor.fra_betriebsrichtung_fluglaerm_bald` | `warning_minutes`, `starts_in_minutes`, `noise_direction`, `next_slot`, `source`, `last_update` |
-| `binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast` | `current_direction`, `new_direction`, `next_slot`, `source`, `last_update` |
-| `sensor.fra_betriebsrichtung_naechster_fluglaerm` | `noise_direction`, `direction`, `from`, `to`, `date`, `end`, `source`, `last_update` |
-| `sensor.fra_betriebsrichtung_naechster_richtungswechsel` | `current_direction`, `new_direction`, `from`, `to`, `date`, `end`, `source`, `last_update` |
-
 ## Installation
 
 ### HACS
@@ -102,52 +52,31 @@ Useful attributes include:
 2. Add this repository as a custom repository:
    `https://github.com/Orishas/fra_betriebsrichtung`
 3. Select category `Integration`.
-4. Install `FRA Betriebsrichtung`.
-5. Restart Home Assistant.
-6. Add the integration from **Settings > Devices & services**.
-
-The integration has also been submitted for the HACS default repository:
-<https://github.com/hacs/default/pull/7175>
+4. Install `FRA Betriebsrichtung` and restart Home Assistant.
+5. Add the integration from **Settings > Devices & services**.
 
 ### Manual
 
 Copy `custom_components/fra_betriebsrichtung` into your Home Assistant
-configuration directory:
-
-```text
-config/custom_components/fra_betriebsrichtung
-```
-
-Restart Home Assistant and add the integration from the UI.
+configuration directory, restart Home Assistant, and add the integration from
+the UI.
 
 ## Configuration
 
-FRA Betriebsrichtung is configured from the Home Assistant UI.
+1. Go to **Settings > Devices & services > Add integration** and pick
+   `FRA Betriebsrichtung`.
+2. Choose the operating direction that usually causes aircraft noise at your
+   location (`BR 07` for easterly operations or `BR 25` for westerly
+   operations).
+3. Choose the warning time in minutes for forecast aircraft noise.
 
-1. Go to **Settings > Devices & services**.
-2. Click **Add integration**.
-3. Search for `FRA Betriebsrichtung`.
-4. Select the operating direction that usually causes aircraft noise at your
-   location:
-   - `BR 07`
-   - `BR 25`
-5. Choose the warning time in minutes for forecast aircraft noise.
-6. Submit the setup dialog.
-
-You can change the noise direction and warning time later from the integration
-options.
-
-Only one config entry is supported.
+You can change both options later from the integration options. Only one
+config entry is supported.
 
 ## Events
 
-The integration fires an event when the current operating direction changes:
-
-```text
-fra_betriebsrichtung_direction_changed
-```
-
-Event data:
+The integration fires `fra_betriebsrichtung_direction_changed` when the
+current operating direction changes. Event data:
 
 - `old_direction`
 - `new_direction`
@@ -155,24 +84,21 @@ Event data:
 - `noise_active`
 - `source`
 - `last_update`
-- `current_since`
 - `next_slot`
 
 The event is not fired during initial setup.
 
-## Service actions
+## Service action
 
 ### `fra_betriebsrichtung.refresh`
 
-Refreshes the integration immediately. When called with response data, it
-returns a compact automation-friendly summary:
+Refreshes the integration immediately. When called with `response_variable`,
+it returns a compact summary for automations:
 
 - `current_direction`
 - `forecast_direction`
 - `noise_active`
-- `forecast_noise_active`
 - `next_noise_slot`
-- `next_direction_change`
 - `source`
 - `last_update`
 
@@ -188,29 +114,12 @@ automation:
   - alias: "FRA aircraft noise active"
     trigger:
       - platform: state
-        entity_id: binary_sensor.fra_betriebsrichtung_fluglaerm
+        entity_id: binary_sensor.fra_betriebsrichtung_aircraft_noise
         to: "on"
     action:
       - service: notify.mobile_app_phone
         data:
           message: "FRA operating direction now matches your local noise direction."
-```
-
-### Notify when the forecast predicts aircraft noise
-
-```yaml
-automation:
-  - alias: "FRA aircraft noise forecast"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.fra_betriebsrichtung_fluglaerm_forecast
-        to: "on"
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          message: >-
-            FRA forecast matches your noise direction from
-            {{ state_attr('sensor.fra_betriebsrichtung_forecast', 'next_slot')['from'] }}.
 ```
 
 ### Notify before forecast aircraft noise starts
@@ -220,34 +129,15 @@ automation:
   - alias: "FRA aircraft noise warning"
     trigger:
       - platform: state
-        entity_id: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
+        entity_id: binary_sensor.fra_betriebsrichtung_aircraft_noise_warning
         to: "on"
     action:
       - service: notify.mobile_app_phone
         data:
           message: >-
             FRA aircraft noise is forecast in
-            {{ state_attr('binary_sensor.fra_betriebsrichtung_fluglaerm_bald', 'starts_in_minutes') }}
+            {{ state_attr('binary_sensor.fra_betriebsrichtung_aircraft_noise_warning', 'starts_in_minutes') }}
             minutes.
-```
-
-### Notify when the forecast changes direction
-
-```yaml
-automation:
-  - alias: "FRA direction change forecast"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast
-        to: "on"
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          message: >-
-            FRA forecast changes from
-            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'current_direction') }}
-            to
-            {{ state_attr('binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast', 'new_direction') }}.
 ```
 
 ### React to direction changes
@@ -290,57 +180,36 @@ automation:
 type: entities
 title: FRA Betriebsrichtung
 entities:
-  - entity: sensor.fra_betriebsrichtung_aktuell
-    name: Aktuelle Betriebsrichtung
+  - entity: sensor.fra_betriebsrichtung_current_direction
   - entity: sensor.fra_betriebsrichtung_forecast
-    name: Nächste Betriebsrichtung
-  - entity: binary_sensor.fra_betriebsrichtung_fluglaerm
-    name: Fluglärm aktuell
-  - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_forecast
-    name: Fluglärm im nächsten Slot
-  - entity: binary_sensor.fra_betriebsrichtung_fluglaerm_bald
-    name: Fluglärmwarnung
-  - entity: binary_sensor.fra_betriebsrichtung_richtungswechsel_forecast
-    name: Richtungswechsel erwartet
-  - entity: sensor.fra_betriebsrichtung_naechster_fluglaerm
-    name: Nächster Fluglärmbeginn
-  - entity: sensor.fra_betriebsrichtung_naechster_richtungswechsel
-    name: Nächster Richtungswechsel
+  - entity: sensor.fra_betriebsrichtung_next_aircraft_noise
+  - entity: binary_sensor.fra_betriebsrichtung_aircraft_noise
+  - entity: binary_sensor.fra_betriebsrichtung_aircraft_noise_warning
 ```
 
 ## Data sources
 
-Primary source:
+The integration polls every 30 minutes and uses public HTML pages only. No
+hidden or undocumented API endpoints.
 
-- <https://www.umwelthaus.org/fluglaerm/anwendungen-service/aktuelle-betriebsrichtung-und-prognose/>
+- Primary: <https://www.umwelthaus.org/fluglaerm/anwendungen-service/aktuelle-betriebsrichtung-und-prognose/>
+- Fallback: <https://betriebsrichtungsprognose.de/frankfurt-fra/>
 
-Fallback source:
-
-- <https://betriebsrichtungsprognose.de/frankfurt-fra/>
-
-The integration polls every 30 minutes and prefers Umwelthaus. The fallback
-source is used when primary data is incomplete or unavailable.
-
-## Updates with HACS
-
-HACS tracks GitHub releases for this repository. When a new release is
-published, HACS can show it as an update in Home Assistant. Install the update
-from HACS and restart Home Assistant so the updated Python code is loaded.
+The fallback source is used when primary data is incomplete or unavailable.
 
 ## Troubleshooting
 
-- If the entities are unavailable, check the integration diagnostics from
-  **Settings > Devices & services**.
-- In diagnostics, `fallback_used: true` means the primary source was incomplete
-  and the fallback source supplied missing data.
-- Website structures can change. Parser failures are handled gracefully, and the
+- If entities are unavailable, open the integration diagnostics from
+  **Settings > Devices & services**. `fallback_used: true` means the primary
+  source was incomplete and the fallback supplied missing data.
+- Website structures can change. Parser failures are handled gracefully — the
   integration does not invent operating direction data.
 
 ## Acknowledgements
 
-Thank you to the Umwelt- und Nachbarschaftshaus / Umwelthaus and to
-betriebsrichtungsprognose.de for publishing operating direction information for
-Frankfurt Airport.
+Thanks to the Umwelt- und Nachbarschaftshaus / Umwelthaus and to
+betriebsrichtungsprognose.de for publishing operating direction information
+for Frankfurt Airport.
 
-This integration is not affiliated with, endorsed by, or officially connected to
-those websites or their operators.
+This integration is not affiliated with, endorsed by, or officially connected
+to those websites or their operators.
