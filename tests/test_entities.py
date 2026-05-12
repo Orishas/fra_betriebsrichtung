@@ -18,6 +18,7 @@ from custom_components.fra_betriebsrichtung import (
 )
 from custom_components.fra_betriebsrichtung.binary_sensor import (
     BINARY_SENSORS,
+    BinarySensorRenderConfig,
     FraBinarySensor,
 )
 from custom_components.fra_betriebsrichtung.const import (
@@ -387,6 +388,35 @@ def test_refresh_service_without_loaded_entry_raises() -> None:
 
     with pytest.raises(HomeAssistantError):
         asyncio.run(_async_handle_refresh(hass, SimpleNamespace(return_response=True)))
+
+
+def test_binary_sensor_does_not_shadow_entity_context() -> None:
+    """Regression: ``Entity._context`` must remain the HA Context slot.
+
+    Earlier versions exposed a ``BinarySensorContext`` dataclass via a
+    ``_context`` property, which collided with the reserved attribute
+    ``homeassistant.helpers.entity.Entity._context``. HA writes the
+    state-change ``Context`` there, then reads ``.user_id`` / ``.parent_id``
+    / ``._as_dict`` during state serialisation — which crashed with
+    ``AttributeError`` on every ``/api/states`` request.
+    """
+    entry = _entry(_data(), DIRECTION_BR25, warning_minutes=42)
+    sensor = _binary_sensor(entry, "aircraft_noise")
+
+    # The render config lives on a non-reserved attribute.
+    assert isinstance(sensor._render_config, BinarySensorRenderConfig)
+    assert sensor._render_config.noise_direction == DIRECTION_BR25
+    assert sensor._render_config.warning_minutes == 42
+
+    # ``_context`` must NOT carry the integration's render config — that
+    # attribute name belongs to HA's Entity.Context slot. (Whether HA later
+    # writes a real Context there is HA's business.)
+    assert not isinstance(
+        getattr(sensor, "_context", None), BinarySensorRenderConfig
+    )
+    # The class itself must not redefine ``_context`` as a property either,
+    # otherwise HA's ``Entity._context = context`` assignment would fail.
+    assert not isinstance(type(sensor).__dict__.get("_context"), property)
 
 
 def test_refresh_service_refresh_failure_raises() -> None:
