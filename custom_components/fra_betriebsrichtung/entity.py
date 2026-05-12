@@ -7,6 +7,8 @@ from datetime import datetime
 from math import ceil
 from typing import Any
 
+from homeassistant.util import dt as dt_util
+
 from .const import (
     ATTR_ERRORS,
     ATTR_FALLBACK_OK,
@@ -71,7 +73,7 @@ def first_forecast_slot(
     """Return the first upcoming forecast slot."""
     if data is None or not data.forecast_slots:
         return None
-    return _first_matching_slot(data.forecast_slots, now or _now())
+    return _first_matching_slot(data.forecast_slots, now or dt_util.now())
 
 
 def next_noise_slot(
@@ -84,43 +86,9 @@ def next_noise_slot(
         return None
     return _first_matching_slot(
         data.forecast_slots,
-        now or _now(),
+        now or dt_util.now(),
         lambda slot: slot_matches_direction(slot, noise_direction),
     )
-
-
-def next_direction_change_slot(
-    data: FraBetriebsrichtungData | None,
-    now: datetime | None = None,
-) -> ForecastSlot | None:
-    """Return the next forecast slot that differs from the current direction."""
-    if data is None or data.current_direction is None:
-        return None
-    return _first_matching_slot(
-        data.forecast_slots,
-        now or _now(),
-        lambda slot: not slot_matches_direction(slot, data.current_direction),
-    )
-
-
-def next_upcoming_noise_slot(
-    data: FraBetriebsrichtungData | None,
-    noise_direction: str,
-    now: datetime,
-) -> ForecastSlot | None:
-    """Return the first future noise slot."""
-    if data is None:
-        return None
-    return _first_matching_slot(
-        data.forecast_slots,
-        now,
-        lambda slot: slot_matches_direction(slot, noise_direction),
-    )
-
-
-def slot_label(slot: ForecastSlot) -> str:
-    """Return a short label for a forecast slot."""
-    return f"{slot.direction} von {slot.start} bis {slot.end}"
 
 
 def slot_start_datetime(slot: ForecastSlot) -> datetime | None:
@@ -164,10 +132,6 @@ def _first_matching_slot(
 def _is_upcoming(slot: ForecastSlot, now: datetime) -> bool:
     start = slot_start_datetime(slot)
     return start is not None and start >= now
-
-
-def _now() -> datetime:
-    return datetime.now().astimezone()
 
 
 def without_none(values: dict[str, Any]) -> dict[str, Any]:

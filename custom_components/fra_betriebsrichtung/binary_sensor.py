@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -16,9 +18,7 @@ from homeassistant.util import dt as dt_util
 from . import FraBetriebsrichtungConfigEntry
 from .const import (
     ATTR_CURRENT_DIRECTION,
-    ATTR_FORECAST_DIRECTION,
     ATTR_LAST_UPDATE,
-    ATTR_NEW_DIRECTION,
     ATTR_NEXT_SLOT,
     ATTR_NOISE_DIRECTION,
     ATTR_SOURCE,
@@ -31,11 +31,96 @@ from .entity import (
     configured_noise_direction,
     configured_warning_minutes,
     device_info,
-    first_forecast_slot,
-    next_upcoming_noise_slot,
-    slot_matches_direction,
+    next_noise_slot,
     starts_in_minutes,
     suggested_object_id,
+)
+from .models import FraBetriebsrichtungData
+
+
+@dataclass(frozen=True)
+class BinarySensorContext:
+    """Per-entity configuration injected into description callables."""
+
+    noise_direction: str
+    warning_minutes: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class FraBinarySensorEntityDescription(BinarySensorEntityDescription):
+    """Describes a FRA Betriebsrichtung binary sensor."""
+
+    is_on_fn: Callable[[FraBetriebsrichtungData, BinarySensorContext], bool | None]
+    attrs_fn: Callable[[FraBetriebsrichtungData, BinarySensorContext], dict[str, Any]]
+    available_fn: Callable[[FraBetriebsrichtungData | None], bool] = (
+        lambda data: data is not None and data.current_direction is not None
+    )
+
+
+def _aircraft_noise_is_on(
+    data: FraBetriebsrichtungData,
+    context: BinarySensorContext,
+) -> bool:
+    return data.current_direction == context.noise_direction
+
+
+def _aircraft_noise_attrs(
+    data: FraBetriebsrichtungData,
+    context: BinarySensorContext,
+) -> dict[str, Any]:
+    return {
+        ATTR_NOISE_DIRECTION: context.noise_direction,
+        ATTR_CURRENT_DIRECTION: data.current_direction,
+        ATTR_SOURCE: data.source,
+        ATTR_LAST_UPDATE: data.last_update,
+    }
+
+
+def _aircraft_noise_warning_is_on(
+    data: FraBetriebsrichtungData,
+    context: BinarySensorContext,
+) -> bool:
+    if data.current_direction == context.noise_direction:
+        return False
+    now = dt_util.now()
+    slot = next_noise_slot(data, context.noise_direction, now)
+    if slot is None:
+        return False
+    minutes_until = starts_in_minutes(slot, now)
+    return minutes_until is not None and minutes_until <= context.warning_minutes
+
+
+def _aircraft_noise_warning_attrs(
+    data: FraBetriebsrichtungData,
+    context: BinarySensorContext,
+) -> dict[str, Any]:
+    now = dt_util.now()
+    slot = next_noise_slot(data, context.noise_direction, now)
+    return {
+        ATTR_WARNING_MINUTES: context.warning_minutes,
+        ATTR_STARTS_IN_MINUTES: starts_in_minutes(slot, now) if slot else None,
+        ATTR_NOISE_DIRECTION: context.noise_direction,
+        ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
+        ATTR_SOURCE: data.source,
+        ATTR_LAST_UPDATE: data.last_update,
+    }
+
+
+BINARY_SENSORS: tuple[FraBinarySensorEntityDescription, ...] = (
+    FraBinarySensorEntityDescription(
+        key="aircraft_noise",
+        translation_key="aircraft_noise",
+        icon="mdi:airplane-alert",
+        is_on_fn=_aircraft_noise_is_on,
+        attrs_fn=_aircraft_noise_attrs,
+    ),
+    FraBinarySensorEntityDescription(
+        key="aircraft_noise_warning",
+        translation_key="aircraft_noise_warning",
+        icon="mdi:airplane-clock",
+        is_on_fn=_aircraft_noise_warning_is_on,
+        attrs_fn=_aircraft_noise_warning_attrs,
+    ),
 )
 
 
@@ -45,295 +130,65 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up FRA Betriebsrichtung binary sensors."""
+    coordinator = entry.runtime_data.coordinator
     async_add_entities(
-        [
-            FraBetriebsrichtungNoiseSensor(
-                entry,
-                entry.runtime_data.coordinator,
-            ),
-            FraBetriebsrichtungForecastNoiseSensor(
-                entry,
-                entry.runtime_data.coordinator,
-            ),
-            FraBetriebsrichtungSoonNoiseSensor(
-                entry,
-                entry.runtime_data.coordinator,
-            ),
-            FraBetriebsrichtungDirectionChangeForecastSensor(
-                entry.runtime_data.coordinator,
-            ),
-        ]
+        FraBinarySensor(entry, coordinator, description)
+        for description in BINARY_SENSORS
     )
 
 
-class FraBetriebsrichtungNoiseSensor(
+class FraBinarySensor(
     CoordinatorEntity[FraBetriebsrichtungCoordinator],
     BinarySensorEntity,
 ):
-    """Binary sensor indicating whether the current direction causes local noise."""
+    """Representation of a FRA Betriebsrichtung binary sensor."""
 
     _attr_has_entity_name = True
-    entity_description = BinarySensorEntityDescription(
-        key="fluglaerm",
-        translation_key="aircraft_noise",
-        icon="mdi:airplane-alert",
-    )
+    entity_description: FraBinarySensorEntityDescription
 
     def __init__(
         self,
         entry: FraBetriebsrichtungConfigEntry,
         coordinator: FraBetriebsrichtungCoordinator,
+        description: FraBinarySensorEntityDescription,
     ) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_fluglaerm"
+        self.entity_description = description
+        self._attr_unique_id = f"{DOMAIN}_{description.key}"
         self._attr_device_info = device_info()
 
     @property
     def suggested_object_id(self) -> str:
         """Return a stable, language-independent entity object id."""
-        return suggested_object_id("fluglaerm")
+        return suggested_object_id(self.entity_description.key)
+
+    @property
+    def _context(self) -> BinarySensorContext:
+        return BinarySensorContext(
+            noise_direction=configured_noise_direction(self._entry),
+            warning_minutes=configured_warning_minutes(self._entry),
+        )
 
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self.coordinator.data.current_direction is not None
+        return super().available and self.entity_description.available_fn(
+            self.coordinator.data
         )
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the configured noise direction is currently active."""
+        """Return the binary sensor state."""
         if not self.available or self.coordinator.data is None:
             return None
-        return self.coordinator.data.current_direction == self._noise_direction
+        return self.entity_description.is_on_fn(self.coordinator.data, self._context)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity attributes."""
         data = self.coordinator.data
-        return {
-            ATTR_NOISE_DIRECTION: self._noise_direction,
-            ATTR_CURRENT_DIRECTION: data.current_direction if data else None,
-            ATTR_SOURCE: data.source if data else None,
-            ATTR_LAST_UPDATE: data.last_update if data else None,
-        }
-
-    @property
-    def _noise_direction(self) -> str:
-        """Return the configured local noise direction."""
-        return configured_noise_direction(self._entry)
-
-
-class FraBetriebsrichtungForecastNoiseSensor(
-    CoordinatorEntity[FraBetriebsrichtungCoordinator],
-    BinarySensorEntity,
-):
-    """Binary sensor indicating whether the next forecast slot causes noise."""
-
-    _attr_has_entity_name = True
-    entity_description = BinarySensorEntityDescription(
-        key="fluglaerm_forecast",
-        translation_key="aircraft_noise_forecast",
-        icon="mdi:airplane-clock",
-    )
-
-    def __init__(
-        self,
-        entry: FraBetriebsrichtungConfigEntry,
-        coordinator: FraBetriebsrichtungCoordinator,
-    ) -> None:
-        """Initialize the binary sensor."""
-        super().__init__(coordinator)
-        self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_fluglaerm_forecast"
-        self._attr_device_info = device_info()
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Return a stable, language-independent entity object id."""
-        return suggested_object_id("fluglaerm_forecast")
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return (
-            super().available
-            and first_forecast_slot(self.coordinator.data, dt_util.now()) is not None
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the next forecast direction matches local noise."""
-        slot = first_forecast_slot(self.coordinator.data, dt_util.now())
-        if not self.available or slot is None:
-            return None
-        return slot_matches_direction(slot, self._noise_direction)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return entity attributes."""
-        data = self.coordinator.data
-        slot = first_forecast_slot(data, dt_util.now())
-        return {
-            ATTR_NOISE_DIRECTION: self._noise_direction,
-            ATTR_FORECAST_DIRECTION: slot.direction if slot else None,
-            ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
-            ATTR_SOURCE: data.source if data else None,
-            ATTR_LAST_UPDATE: data.last_update if data else None,
-        }
-
-    @property
-    def _noise_direction(self) -> str:
-        """Return the configured local noise direction."""
-        return configured_noise_direction(self._entry)
-
-
-class FraBetriebsrichtungSoonNoiseSensor(
-    CoordinatorEntity[FraBetriebsrichtungCoordinator],
-    BinarySensorEntity,
-):
-    """Binary sensor indicating whether aircraft noise is expected soon."""
-
-    _attr_has_entity_name = True
-    entity_description = BinarySensorEntityDescription(
-        key="fluglaerm_bald",
-        translation_key="aircraft_noise_soon",
-        icon="mdi:airplane-clock",
-    )
-
-    def __init__(
-        self,
-        entry: FraBetriebsrichtungConfigEntry,
-        coordinator: FraBetriebsrichtungCoordinator,
-    ) -> None:
-        """Initialize the binary sensor."""
-        super().__init__(coordinator)
-        self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_fluglaerm_bald"
-        self._attr_device_info = device_info()
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Return a stable, language-independent entity object id."""
-        return suggested_object_id("fluglaerm_bald")
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self.coordinator.data.current_direction is not None
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if local aircraft noise is forecast soon."""
-        data = self.coordinator.data
-        if not self.available or data is None:
-            return None
-        if data.current_direction == self._noise_direction:
-            return False
-
-        now = dt_util.now()
-        slot = next_upcoming_noise_slot(data, self._noise_direction, now)
-        if slot is None:
-            return False
-        starts_in = starts_in_minutes(slot, now)
-        return starts_in is not None and starts_in <= self._warning_minutes
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return entity attributes."""
-        data = self.coordinator.data
-        now = dt_util.now()
-        slot = (
-            next_upcoming_noise_slot(data, self._noise_direction, now)
-            if data
-            else None
-        )
-        return {
-            ATTR_WARNING_MINUTES: self._warning_minutes,
-            ATTR_STARTS_IN_MINUTES: starts_in_minutes(slot, now)
-            if slot
-            else None,
-            ATTR_NOISE_DIRECTION: self._noise_direction,
-            ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
-            ATTR_SOURCE: data.source if data else None,
-            ATTR_LAST_UPDATE: data.last_update if data else None,
-        }
-
-    @property
-    def _noise_direction(self) -> str:
-        """Return the configured local noise direction."""
-        return configured_noise_direction(self._entry)
-
-    @property
-    def _warning_minutes(self) -> int:
-        """Return the configured warning window."""
-        return configured_warning_minutes(self._entry)
-
-
-class FraBetriebsrichtungDirectionChangeForecastSensor(
-    CoordinatorEntity[FraBetriebsrichtungCoordinator],
-    BinarySensorEntity,
-):
-    """Binary sensor indicating whether the next forecast slot changes direction."""
-
-    _attr_has_entity_name = True
-    entity_description = BinarySensorEntityDescription(
-        key="richtungswechsel_forecast",
-        translation_key="direction_change_forecast",
-        icon="mdi:swap-horizontal",
-    )
-
-    def __init__(
-        self,
-        coordinator: FraBetriebsrichtungCoordinator,
-    ) -> None:
-        """Initialize the binary sensor."""
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{DOMAIN}_richtungswechsel_forecast"
-        self._attr_device_info = device_info()
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Return a stable, language-independent entity object id."""
-        return suggested_object_id("richtungswechsel_forecast")
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        data = self.coordinator.data
-        return (
-            super().available
-            and data is not None
-            and data.current_direction is not None
-            and first_forecast_slot(data, dt_util.now()) is not None
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if the next forecast slot differs from the current direction."""
-        data = self.coordinator.data
-        slot = first_forecast_slot(data, dt_util.now())
-        if not self.available or data is None or slot is None:
-            return None
-        return not slot_matches_direction(slot, data.current_direction)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return entity attributes."""
-        data = self.coordinator.data
-        slot = first_forecast_slot(data, dt_util.now())
-        return {
-            ATTR_CURRENT_DIRECTION: data.current_direction if data else None,
-            ATTR_NEW_DIRECTION: slot.direction if slot else None,
-            ATTR_NEXT_SLOT: slot.as_dict() if slot else None,
-            ATTR_SOURCE: data.source if data else None,
-            ATTR_LAST_UPDATE: data.last_update if data else None,
-        }
+        if data is None:
+            return {}
+        return self.entity_description.attrs_fn(data, self._context)

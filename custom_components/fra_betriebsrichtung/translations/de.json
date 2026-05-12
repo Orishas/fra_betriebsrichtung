@@ -45,31 +45,22 @@
   },
   "entity": {
     "sensor": {
-      "current": {
-        "name": "Aktuelle Betriebsrichtung"
+      "current_direction": {
+        "name": "Betriebsrichtung"
       },
       "forecast": {
-        "name": "Nächste Betriebsrichtung"
+        "name": "Prognose"
       },
-      "next_noise": {
-        "name": "Nächster Fluglärmbeginn"
-      },
-      "next_direction_change": {
-        "name": "Nächster Richtungswechsel"
+      "next_aircraft_noise": {
+        "name": "Nächster Fluglärm"
       }
     },
     "binary_sensor": {
       "aircraft_noise": {
-        "name": "Fluglärm aktuell"
+        "name": "Fluglärm"
       },
-      "aircraft_noise_forecast": {
-        "name": "Fluglärm im nächsten Slot"
-      },
-      "aircraft_noise_soon": {
+      "aircraft_noise_warning": {
         "name": "Fluglärmwarnung"
-      },
-      "direction_change_forecast": {
-        "name": "Richtungswechsel erwartet"
       }
     }
   },

@@ -99,7 +99,6 @@ def test_parse_umwelthaus_current_and_forecast(monkeypatch) -> None:
     assert data.source == SOURCE_UMWELTHAUS
     assert data.current_direction == DIRECTION_BR25
     assert data.current_label == DIRECTION_BR25
-    assert data.current_since == "22. Apr., 06.00 Uhr"
     assert data.current_since_start == "2026-04-22T06:00:00+02:00"
     assert data.current_duration_minutes == 360
     assert data.last_update == "22.04.2026 08:30"

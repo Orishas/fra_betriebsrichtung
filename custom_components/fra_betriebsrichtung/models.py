@@ -45,7 +45,6 @@ class FraBetriebsrichtungData:
 
     current_direction: str | None = None
     current_label: str | None = None
-    current_since: str | None = None
     current_since_start: str | None = None
     current_duration_minutes: int | None = None
     forecast_summary: str | None = None

@@ -19,9 +19,7 @@ from .coordinator import FraBetriebsrichtungCoordinator
 from .entity import (
     configured_noise_direction,
     first_forecast_slot,
-    next_direction_change_slot,
     next_noise_slot,
-    slot_matches_direction,
 )
 from .models import FraBetriebsrichtungData
 
@@ -134,8 +132,7 @@ def _refresh_response(
     next_noise = (
         next_noise_slot(data, noise_direction) if data and noise_direction else None
     )
-    next_change = next_direction_change_slot(data)
-    response: dict[str, Any] = {
+    return {
         "current_direction": data.current_direction if data else None,
         "forecast_direction": first_slot.direction if first_slot else None,
         "noise_active": (
@@ -143,14 +140,7 @@ def _refresh_response(
             if data and data.current_direction and noise_direction
             else None
         ),
-        "forecast_noise_active": (
-            slot_matches_direction(first_slot, noise_direction)
-            if first_slot and noise_direction
-            else None
-        ),
         "next_noise_slot": next_noise.as_dict() if next_noise else None,
-        "next_direction_change": next_change.as_dict() if next_change else None,
         "source": data.source if data else None,
         "last_update": data.last_update if data else None,
     }
-    return response
