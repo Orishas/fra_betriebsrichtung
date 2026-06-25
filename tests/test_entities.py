@@ -40,6 +40,7 @@ from custom_components.fra_betriebsrichtung.entity import (
     first_forecast_slot,
     next_noise_slot,
     slot_matches_direction,
+    suggested_object_id,
 )
 from custom_components.fra_betriebsrichtung.models import (
     ForecastSlot,
@@ -286,6 +287,47 @@ def test_entity_attributes_do_not_expose_health_fields(monkeypatch) -> None:
         assert health_keys.isdisjoint(entity.extra_state_attributes)
 
 
+def test_suggested_object_ids_are_device_relative() -> None:
+    """Suggested object ids avoid duplicating the device/domain prefix."""
+    entry = _entry(_data(), DIRECTION_BR07)
+    entities = (
+        FraBetriebsrichtungSensor(SimpleNamespace(data=_data()), SENSORS[0]),
+        FraBetriebsrichtungSensor(SimpleNamespace(data=_data()), SENSORS[1]),
+        FraNextAircraftNoiseSensor(entry, entry.runtime_data.coordinator),
+        _binary_sensor(entry, "aircraft_noise"),
+        _binary_sensor(entry, "aircraft_noise_warning"),
+    )
+
+    assert suggested_object_id("forecast") == "betriebsrichtung_forecast"
+    assert [entity.suggested_object_id for entity in entities] == [
+        "betriebsrichtung_current_direction",
+        "betriebsrichtung_forecast",
+        "betriebsrichtung_next_aircraft_noise",
+        "betriebsrichtung_aircraft_noise",
+        "betriebsrichtung_aircraft_noise_warning",
+    ]
+    assert all(
+        not entity.suggested_object_id.startswith(f"{DOMAIN}_")
+        for entity in entities
+    )
+    assert [
+        f"fra_{entity.suggested_object_id}" for entity in entities
+    ] == [
+        f"{DOMAIN}_current_direction",
+        f"{DOMAIN}_forecast",
+        f"{DOMAIN}_next_aircraft_noise",
+        f"{DOMAIN}_aircraft_noise",
+        f"{DOMAIN}_aircraft_noise_warning",
+    ]
+    assert [entity._attr_unique_id for entity in entities] == [
+        f"{DOMAIN}_current_direction",
+        f"{DOMAIN}_forecast",
+        f"{DOMAIN}_next_aircraft_noise",
+        f"{DOMAIN}_aircraft_noise",
+        f"{DOMAIN}_aircraft_noise_warning",
+    ]
+
+
 def test_last_success_does_not_affect_data_equality() -> None:
     """Volatile last_success does not bypass coordinator equality checks."""
     data = _data()
@@ -436,5 +478,3 @@ def test_refresh_service_refresh_failure_raises() -> None:
 
     with pytest.raises(HomeAssistantError):
         asyncio.run(_async_handle_refresh(hass, SimpleNamespace(return_response=True)))
-
-

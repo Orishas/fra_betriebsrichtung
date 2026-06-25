@@ -18,6 +18,10 @@ direction at Frankfurt Airport (FRA), with a noise indicator for your location.
 | `binary_sensor.fra_betriebsrichtung_aircraft_noise` | Aircraft noise | `on` / `off` | Current direction matches your configured noise direction |
 | `binary_sensor.fra_betriebsrichtung_aircraft_noise_warning` | Aircraft noise warning | `on` / `off` | Aircraft noise is forecast within your warning window |
 
+Existing installations that already registered `fra_fra_betriebsrichtung_*`
+entity IDs keep those registry IDs until they are manually renamed in Home
+Assistant or the integration is removed and added again.
+
 ### Entity attributes
 
 | Entity | Attributes |
@@ -187,6 +191,254 @@ entities:
   - entity: binary_sensor.fra_betriebsrichtung_aircraft_noise_warning
 ```
 
+### Forecast bar with button-card
+
+For a compact horizontal forecast bar, install
+[`button-card`](https://github.com/custom-cards/button-card) and adjust
+`noise_direction` to the direction that causes aircraft noise at your
+location. The bar colors the configured noise direction red, the other
+direction green, and direction changes orange.
+
+```yaml
+type: vertical-stack
+cards:
+  - type: heading
+    icon: mdi:airplane-marker
+    heading: FRA Betriebsrichtung
+    badges:
+      - type: entity
+        entity: sensor.fra_betriebsrichtung_current_direction
+        name: Current
+        show_state: true
+        show_icon: true
+        state_content:
+          - label
+        tap_action:
+          action: more-info
+      - type: entity
+        entity: binary_sensor.fra_betriebsrichtung_aircraft_noise
+        name: Noise
+        show_state: true
+        show_icon: true
+        state_content:
+          - state
+        tap_action:
+          action: more-info
+      - type: entity
+        entity: sensor.fra_betriebsrichtung_next_aircraft_noise
+        name: Next noise
+        show_state: true
+        show_icon: true
+        state_content:
+          - state
+        tap_action:
+          action: more-info
+  - type: custom:button-card
+    entity: sensor.fra_betriebsrichtung_forecast
+    variables:
+      noise_direction: BR 07
+    show_name: false
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: more-info
+    custom_fields:
+      bar: |
+        [[[
+          const slots = entity.attributes.slots || [];
+          const noiseDirection = variables.noise_direction || "BR 07";
+
+          if (!slots.length) {
+            return `<div class="empty">No forecast available</div>`;
+          }
+
+          const escapeHtml = (value) => String(value ?? "").replace(
+            /[&<>"']/g,
+            (char) => ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[char]),
+          );
+          const directionParts = (direction) => String(direction || "")
+            .split("/")
+            .map((part) => part.trim());
+          const isNoiseDirection = (direction) =>
+            directionParts(direction).includes(noiseDirection);
+          const color = (direction) =>
+            isNoiseDirection(direction)
+              ? "var(--error-color)"
+              : "var(--success-color)";
+          const transitionColor = "var(--warning-color)";
+          const isTransition = (index) =>
+            index > 0 && slots[index - 1].direction !== slots[index].direction;
+          const background = (slot, index) => {
+            if (!isTransition(index)) {
+              return color(slot.direction);
+            }
+
+            const previousColor = color(slots[index - 1].direction);
+            const currentColor = color(slot.direction);
+            return `linear-gradient(90deg,
+              ${previousColor} 0%,
+              ${previousColor} 40%,
+              ${transitionColor} 40%,
+              ${transitionColor} 60%,
+              ${currentColor} 60%,
+              ${currentColor} 100%)`;
+          };
+          const title = (slot, index) => {
+            const status = isNoiseDirection(slot.direction)
+              ? "noise direction"
+              : "other direction";
+
+            if (isTransition(index)) {
+              return `${slot.date} ${slot.from}-${slot.to} - change from ${slots[index - 1].direction} to ${slot.direction}`;
+            }
+
+            return `${slot.date} ${slot.from}-${slot.to} - ${slot.direction} - ${status}`;
+          };
+
+          const firstStart = new Date(slots[0].start).getTime();
+          const lastEnd = new Date(slots[slots.length - 1].end).getTime();
+          const now = Date.now();
+          const nowPercent = now >= firstStart && now <= lastEnd
+            ? ((now - firstStart) / (lastEnd - firstStart)) * 100
+            : null;
+
+          return `
+            <div class="wrap">
+              <div class="bar" style="grid-template-columns: repeat(${slots.length}, 1fr);">
+                ${slots.map((slot, index) => `
+                  <div class="segment ${isTransition(index) ? "transition" : ""}"
+                       style="background: ${background(slot, index)}"
+                       title="${escapeHtml(title(slot, index))}">
+                  </div>
+                `).join("")}
+                ${nowPercent !== null ? `
+                  <div class="now-marker" style="left: ${nowPercent}%"></div>
+                ` : ""}
+              </div>
+              <div class="labels" style="grid-template-columns: repeat(${slots.length}, 1fr);">
+                ${slots.map((slot, index) => `
+                  <div class="label">
+                    ${index % 3 === 0
+                      ? new Date(slot.start).toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "2-digit",
+                          month: "2-digit",
+                        })
+                      : ""}
+                  </div>
+                `).join("")}
+              </div>
+              <div class="legend">
+                <span><i class="noise"></i>${escapeHtml(noiseDirection)} noise</span>
+                <span><i class="other"></i>Other direction</span>
+                <span><i class="transition-key"></i>Change</span>
+              </div>
+            </div>
+          `;
+        ]]]
+    styles:
+      card:
+        - padding: 8px
+      custom_fields:
+        bar:
+          - width: 100%
+    extra_styles: |
+      .wrap {
+        width: 100%;
+      }
+
+      .bar {
+        position: relative;
+        display: grid;
+        height: 16px;
+        border-radius: 5px;
+        overflow: hidden;
+        background: var(--divider-color);
+      }
+
+      .segment {
+        border-right: 1px solid rgba(255, 255, 255, 0.45);
+      }
+
+      .segment:last-child {
+        border-right: none;
+      }
+
+      .transition {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+      }
+
+      .now-marker {
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        width: 2px;
+        background: var(--primary-text-color);
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.45);
+        z-index: 3;
+      }
+
+      .labels {
+        display: grid;
+        margin-top: 3px;
+      }
+
+      .label {
+        font-size: 8px;
+        line-height: 9px;
+        color: var(--secondary-text-color);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        margin-top: 5px;
+        font-size: 9px;
+        line-height: 10px;
+        color: var(--secondary-text-color);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .legend i {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+      }
+
+      .legend .noise {
+        background: var(--error-color);
+      }
+
+      .legend .other {
+        background: var(--success-color);
+      }
+
+      .legend .transition-key {
+        background: var(--warning-color);
+      }
+
+      .empty {
+        font-size: 11px;
+        color: var(--secondary-text-color);
+      }
+```
+
 ## Data sources
 
 The integration polls every 30 minutes and uses public HTML pages only. No
@@ -210,6 +462,9 @@ The fallback source is used when primary data is incomplete or unavailable.
 Thanks to the Umwelt- und Nachbarschaftshaus / Umwelthaus and to
 betriebsrichtungsprognose.de for publishing operating direction information
 for Frankfurt Airport.
+
+Thanks to [@thecem](https://github.com/thecem) for contributing the forecast
+dashboard card idea and example.
 
 This integration is not affiliated with, endorsed by, or officially connected
 to those websites or their operators.
