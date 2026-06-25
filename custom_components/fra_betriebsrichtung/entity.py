@@ -63,7 +63,7 @@ def health_attributes(
 
 def suggested_object_id(key: str) -> str:
     """Return a stable, language-independent entity object id."""
-    return f"{DOMAIN}_{key}"
+    return f"betriebsrichtung_{key}"
 
 
 def first_forecast_slot(
