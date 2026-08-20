@@ -270,6 +270,15 @@ entities:
   - entity: binary_sensor.fra_betriebsrichtung_aircraft_noise_warning
 ```
 
+## Other airports
+
+This integration is Frankfurt-only, because it reads Frankfurt's official
+operating direction forecast. For any other airport, see
+[Runway Direction](https://github.com/Orishas/runway_direction) — same idea,
+about 2500 airports worldwide, but fed by wind-derived forecasts rather than an
+official one. Where both apply, this one is the more accurate: for Frankfurt,
+keep using it.
+
 ## Data sources
 
 The integration polls every 30 minutes and uses public HTML pages only. No
