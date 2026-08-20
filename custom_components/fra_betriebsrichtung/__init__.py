@@ -21,6 +21,7 @@ from .entity import (
     first_forecast_slot,
     next_noise_slot,
 )
+from .frontend import async_register_card
 from .models import FraBetriebsrichtungData
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -40,8 +41,9 @@ FraBetriebsrichtungConfigEntry = ConfigEntry[FraBetriebsrichtungRuntimeData]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up FRA Betriebsrichtung services."""
+    """Set up FRA Betriebsrichtung services and the dashboard card."""
     hass.data.setdefault(DOMAIN, {})
+    await async_register_card(hass)
 
     async def handle_refresh(call: ServiceCall) -> dict[str, Any] | None:
         """Handle manual refresh action."""
