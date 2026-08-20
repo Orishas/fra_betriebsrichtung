@@ -6,6 +6,10 @@ DOMAIN = "fra_betriebsrichtung"
 
 EVENT_DIRECTION_CHANGED = f"{DOMAIN}_direction_changed"
 
+CARD_FILENAME = "fra-betriebsrichtung-card.js"
+CARD_URL_PATH = f"/{DOMAIN}/{CARD_FILENAME}"
+DATA_CARD_REGISTERED = f"{DOMAIN}_card_registered"
+
 CONF_NOISE_DIRECTION = "noise_direction"
 CONF_WARNING_MINUTES = "warning_minutes"
 

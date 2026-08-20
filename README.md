@@ -178,7 +178,85 @@ automation:
           message: "FRA operating direction currently causes local aircraft noise."
 ```
 
-## Dashboard example
+## Dashboard card
+
+The integration ships its own card. It is served and registered automatically,
+so there is no Lovelace resource to add by hand — after installing or updating
+the integration, `FRA Betriebsrichtung` appears in the card picker. Force-reload
+the browser once (Ctrl/Cmd + Shift + R) if it does not show up right away.
+
+The card needs no configuration at all:
+
+```yaml
+type: custom:fra-betriebsrichtung-card
+```
+
+It finds the integration entities on its own, reads your configured noise
+direction from the integration, and shows:
+
+- the current operating direction with its plain-language label and how long it
+  has been running
+- when aircraft noise is next expected — or, while it is running, when quiet is
+  expected to return
+- a forecast timeline where segment width follows real slot duration, missing
+  forecast slots stay visible as gaps, and a marker shows the current time
+
+### Layouts
+
+`days` (default) draws one row per day on a 24-hour scale, which makes "quiet on
+Sunday morning" readable at a glance:
+
+```yaml
+type: custom:fra-betriebsrichtung-card
+layout: days
+days: 5
+```
+
+`compact` draws a single continuous bar, for a dense dashboard:
+
+```yaml
+type: custom:fra-betriebsrichtung-card
+layout: compact
+days: 3
+show_hero: false
+```
+
+### Card options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `layout` | `days` \| `compact` | `days` | One row per day, or a single bar |
+| `days` | number (1-10) | `5` | Days of forecast to show |
+| `title` | string | integration name | Card title |
+| `icon` | string | `mdi:airplane-takeoff` | Header icon |
+| `show_header` | boolean | `true` | Title row |
+| `show_hero` | boolean | `true` | Current state and next change |
+| `show_legend` | boolean | `true` | Colour legend |
+| `show_now` | boolean | `true` | Current-time marker |
+| `show_footer` | boolean | `true` | Source and update time |
+| `include_current` | boolean | `true` | Extend the timeline back to when the current direction started |
+| `noise_direction` | `auto` \| `BR 07` \| `BR 25` | `auto` | Override the integration's noise direction |
+| `forecast_entity` | entity id | auto | Forecast sensor |
+| `direction_entity` | entity id | auto | Current direction sensor |
+| `noise_entity` | entity id | auto | Aircraft noise binary sensor |
+
+All options are editable in the visual card editor.
+
+### Theming
+
+The card follows your Home Assistant theme. To override its colours, set these
+variables in your theme:
+
+```yaml
+my_theme:
+  fra-noise-color: "#c62828"
+  fra-quiet-color: "#2e7d32"
+  fra-mixed-color: "#ef6c00"
+```
+
+### Entities card
+
+If you prefer a plain list:
 
 ```yaml
 type: entities
@@ -193,11 +271,16 @@ entities:
 
 ### Forecast bar with button-card
 
-For a compact horizontal forecast bar, install
-[`button-card`](https://github.com/custom-cards/button-card) and adjust
+The bundled card above covers this without templates. This template is kept
+for setups that already use
+[`button-card`](https://github.com/custom-cards/button-card). Adjust
 `noise_direction` to the direction that causes aircraft noise at your
 location. The bar colors the configured noise direction red, the other
 direction green, and direction changes orange.
+
+Note that it draws every slot at the same width. Forecasts occasionally skip
+slots, and when they do, the bar and its now-marker drift apart — the bundled
+card sizes each slot by its real duration instead.
 
 ```yaml
 type: vertical-stack
@@ -456,6 +539,16 @@ The fallback source is used when primary data is incomplete or unavailable.
   source was incomplete and the fallback supplied missing data.
 - Website structures can change. Parser failures are handled gracefully — the
   integration does not invent operating direction data.
+- If the dashboard card is missing after an update, force-reload the browser.
+  The card is versioned with the integration, so a cached copy is replaced on
+  the next reload.
+
+## Development
+
+```bash
+python -m pytest tests        # integration tests
+node --test tests/card.test.mjs   # dashboard card tests
+```
 
 ## Acknowledgements
 

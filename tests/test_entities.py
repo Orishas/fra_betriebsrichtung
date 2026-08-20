@@ -405,6 +405,15 @@ def test_refresh_service_returns_response_and_refreshes(monkeypatch) -> None:
     assert "error" not in response
 
 
+async def _noop_async(*args, **kwargs) -> None:
+    """Accept any static path registration."""
+
+
+async def _run_in_executor(func, *args):
+    """Run a blocking call inline for tests."""
+    return func(*args)
+
+
 def test_refresh_service_is_registered_in_async_setup() -> None:
     """Manual refresh action is registered during integration setup."""
 
@@ -416,7 +425,12 @@ def test_refresh_service_is_registered_in_async_setup() -> None:
             self.calls.append((args, kwargs))
 
     services = Services()
-    hass = SimpleNamespace(data={}, services=services)
+    hass = SimpleNamespace(
+        data={},
+        services=services,
+        http=SimpleNamespace(async_register_static_paths=_noop_async),
+        async_add_executor_job=_run_in_executor,
+    )
 
     assert asyncio.run(async_setup(hass, {})) is True
     args, kwargs = services.calls[0]

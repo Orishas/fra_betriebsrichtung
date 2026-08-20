@@ -88,6 +88,26 @@ _module("homeassistant.helpers")
 config_validation = _module("homeassistant.helpers.config_validation")
 config_validation.config_entry_only_config_schema = lambda domain: domain
 
+frontend = _module("homeassistant.components.frontend")
+frontend.add_extra_js_url = lambda hass, url: None
+
+http = _module("homeassistant.components.http")
+http.StaticPathConfig = lambda url_path, path, cache_headers=True: (
+    url_path,
+    path,
+    cache_headers,
+)
+
+loader = _module("homeassistant.loader")
+
+
+async def _async_get_integration(hass: Any, domain: str) -> Any:
+    """Return a minimal integration stub."""
+    return types.SimpleNamespace(version="0.0.0-test")
+
+
+loader.async_get_integration = _async_get_integration
+
 binary_sensor = _module("homeassistant.components.binary_sensor")
 binary_sensor.BinarySensorEntity = type("BinarySensorEntity", (), {})
 binary_sensor.BinarySensorEntityDescription = EntityDescription
