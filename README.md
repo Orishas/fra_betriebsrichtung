@@ -280,6 +280,12 @@ hidden or undocumented API endpoints.
 
 The fallback source is used when primary data is incomplete or unavailable.
 
+The fallback derives the operating direction from wind data rather than
+publishing an official forecast. Where that derivation is not meaningful —
+a tendency close to zero, or wind below 3 kn, where an airport follows its
+preferred operating direction instead of the wind — no slot is reported, so
+the forecast shows a gap rather than a guess.
+
 ## Troubleshooting
 
 - If entities are unavailable, open the integration diagnostics from

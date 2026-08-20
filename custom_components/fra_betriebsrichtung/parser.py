@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta
 import json
 import re
@@ -23,6 +24,30 @@ AIRPORT_TZ = ZoneInfo("Europe/Berlin")
 
 _BR07_RE = re.compile(r"\b(?:BR|Betriebsrichtung)\s*0?7\b|\b07\s*\(Ost\)", re.I)
 _BR25_RE = re.compile(r"\b(?:BR|Betriebsrichtung)\s*25\b|\b25\s*\(West\)", re.I)
+
+# betriebsrichtungsprognose.de ships one chart config per runway axis.
+_BRP_CHART_RE = re.compile(r"window\.BRP_CHARTS\.push\(\s*(\{.*?\})\s*\)\s*;", re.S)
+
+# Only the east/west axis maps onto Frankfurt operating directions. The
+# north/south chart describes runway 18/36 and is skipped.
+_BRP_AXIS_LABELS = {
+    "ostbetrieb": DIRECTION_BR07,
+    "westbetrieb": DIRECTION_BR25,
+}
+
+# The source encodes a tendency from -100 to 100 derived from wind data.
+# Near zero it flips sign on noise alone, so weak readings are dropped
+# instead of being reported as a hard direction.
+BRP_MIN_CONFIDENCE = 40
+
+# Below this wind speed the tendency is not meaningful either: with almost
+# no wind an airport follows its preferred operating direction rather than
+# the wind, which this source does not model. Observed on 2026-08-20, where
+# it reported a three-hour swing to BR 07 at 1.1 kn while the official
+# forecast stayed on BR 25 throughout.
+BRP_MIN_WIND_KN = 3
+
+BRP_SLOT_HOURS = 3
 
 
 def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
@@ -55,58 +80,126 @@ def parse_umwelthaus(html: str) -> FraBetriebsrichtungData | None:
 
 def parse_fallback(html: str) -> FraBetriebsrichtungData | None:
     """Parse the betriebsrichtungsprognose.de fallback page."""
-    labels = _parse_js_array(html, r"labels:\s*(\[[^\]]+\])")
-    values = _parse_js_array(html, r"var\s+abflugData\s*=\s*(\[[^\]]+\])")
-    if not labels or not values:
+    chart = _brp_chart(html)
+    if chart is None:
         return None
 
-    slots: list[ForecastSlot] = []
-    count = min(len(labels), len(values))
-    for index in range(count):
-        direction = _direction_from_fallback_value(values[index])
-        if direction is None:
-            continue
-        start_dt = _datetime_from_fallback_label(labels[index])
-        end_dt = None
-        if start_dt:
-            end_dt = (
-                _datetime_from_fallback_label(labels[index + 1])
-                if index + 1 < count
-                else start_dt + timedelta(hours=3)
-            )
-        if start_dt and end_dt:
-            slots.append(
-                ForecastSlot(
-                    start=start_dt.strftime("%H:%M"),
-                    end=end_dt.strftime("%H:%M"),
-                    direction=direction,
-                    date=start_dt.date().isoformat(),
-                    start_iso=start_dt.isoformat(),
-                    end_iso=end_dt.isoformat(),
-                )
-            )
-            continue
+    slots = _brp_slots(chart)
+    if not slots:
+        return None
 
-        start = _time_from_fallback_label(labels[index])
-        end = (
-            _time_from_fallback_label(labels[index + 1])
-            if index + 1 < count
-            else _add_hours_to_time(start, 3)
-        )
-        if start and end:
-            slots.append(ForecastSlot(start=start, end=end, direction=direction))
-
-    summary = None
-    if slots:
-        first = slots[0]
-        summary = f"{first.direction} ab {first.start}"
-
+    first = slots[0]
     data = FraBetriebsrichtungData(
-        forecast_summary=summary,
-        forecast_slots=tuple(slots),
+        forecast_summary=f"{first.direction} ab {first.start}",
+        forecast_slots=slots,
         source=SOURCE_FALLBACK,
     )
     return data if data.has_any_data else None
+
+
+def _brp_chart(html: str) -> dict[str, Any] | None:
+    """Return the chart config whose axis maps onto BR 07 / BR 25."""
+    for match in _BRP_CHART_RE.finditer(html):
+        try:
+            chart = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(chart, dict):
+            continue
+        if _brp_axis(chart) is not None:
+            return chart
+    return None
+
+
+def _brp_axis(chart: dict[str, Any]) -> tuple[str, str] | None:
+    """Return (positive, negative) directions for a chart, if it maps."""
+    positive = _BRP_AXIS_LABELS.get(str(chart.get("positiveLabel", "")).strip().lower())
+    negative = _BRP_AXIS_LABELS.get(str(chart.get("negativeLabel", "")).strip().lower())
+    if positive is None or negative is None:
+        return None
+    return positive, negative
+
+
+def _brp_slots(chart: dict[str, Any]) -> tuple[ForecastSlot, ...]:
+    """Build merged forecast slots from a chart config."""
+    axis = _brp_axis(chart)
+    labels = chart.get("labels")
+    values = chart.get("direction")
+    if axis is None or not isinstance(labels, list) or not isinstance(values, list):
+        return ()
+
+    winds = chart.get("wind")
+    if not isinstance(winds, list):
+        winds = []
+
+    positive, negative = axis
+    slots: list[ForecastSlot] = []
+    count = min(len(labels), len(values))
+    for index in range(count):
+        start = _datetime_from_fallback_label(labels[index])
+        if start is None:
+            continue
+        end = (
+            _datetime_from_fallback_label(labels[index + 1])
+            if index + 1 < count
+            else start + timedelta(hours=BRP_SLOT_HOURS)
+        )
+        if end is None or end <= start:
+            continue
+
+        wind = winds[index] if index < len(winds) else None
+        direction = _brp_direction(values[index], wind, positive, negative)
+        if direction is None:
+            # Not meaningful — leave a gap rather than reporting a
+            # direction the source cannot support.
+            continue
+
+        previous = slots[-1] if slots else None
+        if (
+            previous is not None
+            and previous.direction == direction
+            and previous.end_iso == start.isoformat()
+        ):
+            slots[-1] = replace(
+                previous,
+                end=end.strftime("%H:%M"),
+                end_iso=end.isoformat(),
+            )
+            continue
+
+        slots.append(
+            ForecastSlot(
+                start=start.strftime("%H:%M"),
+                end=end.strftime("%H:%M"),
+                direction=direction,
+                date=start.date().isoformat(),
+                start_iso=start.isoformat(),
+                end_iso=end.isoformat(),
+            )
+        )
+    return tuple(slots)
+
+
+def _brp_direction(
+    value: Any,
+    wind: Any,
+    positive: str,
+    negative: str,
+) -> str | None:
+    """Map a tendency value onto a direction, or None when it is too weak."""
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if abs(numeric_value) < BRP_MIN_CONFIDENCE:
+        return None
+    if wind is not None:
+        try:
+            if float(wind) < BRP_MIN_WIND_KN:
+                return None
+        except (TypeError, ValueError):
+            pass
+    return positive if numeric_value > 0 else negative
 
 
 def merge_data(
@@ -310,33 +403,6 @@ def _direction_from_state(value: Any) -> str | None:
     return None
 
 
-def _direction_from_fallback_value(value: Any) -> str | None:
-    try:
-        numeric_value = float(value)
-    except (TypeError, ValueError):
-        return None
-
-    if numeric_value > 0:
-        return DIRECTION_BR07
-    if numeric_value < 0:
-        return DIRECTION_BR25
-    return None
-
-
-def _parse_js_array(html: str, pattern: str) -> list[Any] | None:
-    match = re.search(pattern, html, flags=re.S)
-    if not match:
-        return None
-    return json.loads(match.group(1))
-
-
-def _time_from_fallback_label(label: Any) -> str | None:
-    if not isinstance(label, str):
-        return None
-    match = re.search(r"(\d{2}:\d{2})$", label.strip())
-    return match.group(1) if match else None
-
-
 def _datetime_from_fallback_label(label: Any) -> datetime | None:
     if not isinstance(label, str):
         return None
@@ -357,13 +423,6 @@ def _datetime_from_fallback_label(label: Any) -> datetime | None:
     if parsed > now + timedelta(days=180):
         return parsed.replace(year=parsed.year - 1)
     return parsed
-
-
-def _add_hours_to_time(value: str | None, hours: int) -> str | None:
-    if value is None:
-        return None
-    parsed = datetime.strptime(value, "%H:%M")
-    return (parsed + timedelta(hours=hours)).strftime("%H:%M")
 
 
 def _select_text(soup: BeautifulSoup, selector: str) -> str | None:
